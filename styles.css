@@ -1,0 +1,122 @@
+:root {
+    --grid-size: 40px;  /* Size of each grid cell */
+    --grid-color: #CCCCCC;
+    --grid-border: 1px solid var(--grid-color);
+}
+
+body {
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    font-family: Arial, sans-serif;
+    touch-action: none; /* Prevent scrolling while dragging on touch devices */
+}
+
+.game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    user-select: none; /* Prevent text selection during drag */
+}
+
+.score-display {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.game-grid {
+    display: grid;
+    grid-template-columns: repeat(8, var(--grid-size));
+    grid-template-rows: repeat(8, var(--grid-size));
+    gap: 1px;
+    background-color: var(--grid-color);
+    padding: 1px;
+    border: var(--grid-border);
+    position: relative;
+    border-radius: 4px;
+    min-width: calc(var(--grid-size) * 8);
+    min-height: calc(var(--grid-size) * 8);
+}
+
+.grid-cell {
+    width: var(--grid-size);
+    height: var(--grid-size);
+    background-color: white;
+    position: relative;
+    transition: background-color 0.2s ease-out;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
+}
+
+.grid-cell.filled {
+    border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.available-blocks {
+    display: flex;
+    gap: 40px;
+    padding: 20px;
+    background-color: white;
+    border: var(--grid-border);
+    min-height: calc(var(--grid-size) * 3);
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    position: relative;
+}
+
+.block {
+    display: grid;
+    cursor: grab;
+    position: relative;
+    touch-action: none;
+    transition: none; /* Remove transition for instant response */
+    will-change: transform;
+    user-select: none;
+    z-index: 1;
+    background: transparent;
+    border: none;
+}
+
+.block-cell {
+    width: var(--grid-size);
+    height: var(--grid-size);
+    transition: background-color 0.2s;
+    box-sizing: border-box;
+    border: none;
+}
+
+.block.dragging {
+    cursor: grabbing;
+    opacity: 0.95;
+    z-index: 1000;
+    pointer-events: none;
+    transform-origin: center center;
+    box-shadow: none;
+    transition: none !important; /* Force no transition */
+    outline: none;
+    border: none;
+    background: transparent;
+}
+
+.preview {
+    opacity: 0.7;
+    transition: background-color 0.2s ease-out;
+    border: none;
+}
+
+.potential-clear {
+    opacity: 0.4;
+    transition: background-color 0.2s ease-out;
+}
+
+.invalid-placement {
+    border: 2px solid red !important;
+    opacity: 0.6;
+}
