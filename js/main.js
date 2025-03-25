@@ -17,6 +17,11 @@ class Game {
         this.availableBlocks = [];
         this.draggingBlock = null;
         this.draggingElement = null;
+        
+        // Initialize audio controls before game setup
+        this.initAudioControls();
+        
+        // Then set up the game
         this.setupGame();
         console.log('Game: Setup complete');
     }
@@ -117,6 +122,11 @@ class Game {
             }
         });
 
+        // Reset any lingering dragging state
+        this.draggingBlock = null;
+        this.draggingElement = null;
+        this.draggingBlockIndex = undefined;
+
         interact('.block').draggable({
             inertia: false,
             autoScroll: true,
@@ -128,12 +138,22 @@ class Game {
             ],
             listeners: {
                 start: event => {
+                    // Ensure we're not already dragging something
+                    if (this.draggingBlock || this.draggingElement) {
+                        this.draggingBlock = null;
+                        this.draggingElement = null;
+                        this.draggingBlockIndex = undefined;
+                    }
+                    
                     this.onDragStart(event);
                     // Ensure immediate response
                     event.target.style.willChange = 'transform';
                     event.target.style.transition = 'none';
                 },
                 move: event => {
+                    // Skip if we lost track of dragging element
+                    if (!this.draggingElement || !this.draggingBlock) return;
+                    
                     const target = event.target;
                     const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
                     const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
@@ -149,6 +169,11 @@ class Game {
                 end: event => {
                     event.target.style.willChange = 'auto';
                     this.onDragEnd(event);
+                    
+                    // Force reset the element's transform
+                    event.target.style.transform = 'none';
+                    event.target.setAttribute('data-x', 0);
+                    event.target.setAttribute('data-y', 0);
                 }
             }
         });
@@ -401,12 +426,67 @@ class Game {
         this.soundSystem.playSound(SOUND_TYPES.GAME_OVER);
         this.soundSystem.playMusic(SOUND_TYPES.MUSIC_GAME_OVER);
         
-        alert(`Game Over! Final Score: ${this.score}`);
+        // Create game over overlay if it doesn't exist
+        let overlay = document.getElementById('gameOverOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'gameOverOverlay';
+            overlay.className = 'game-over-overlay';
+            
+            const content = document.createElement('div');
+            content.className = 'game-over-content';
+            
+            const title = document.createElement('h2');
+            title.className = 'game-over-title';
+            title.textContent = 'Game Over!';
+            
+            const scoreText = document.createElement('p');
+            scoreText.className = 'game-over-score';
+            scoreText.id = 'finalScore';
+            
+            const restartBtn = document.createElement('button');
+            restartBtn.className = 'restart-button';
+            restartBtn.textContent = 'Play Again';
+            restartBtn.addEventListener('click', () => {
+                overlay.classList.remove('visible');
+                // Reset game after a brief delay for animation
+                setTimeout(() => {
+                    this.gridSystem = new GridSystem(8, 8);
+                    this.score = 0;
+                    this.setupGame();
+                }, 300);
+            });
+            
+            content.appendChild(title);
+            content.appendChild(scoreText);
+            content.appendChild(restartBtn);
+            overlay.appendChild(content);
+            document.body.appendChild(overlay);
+        }
         
-        // Reset game
-        this.gridSystem = new GridSystem(8, 8);
-        this.score = 0;
-        this.setupGame();
+        // Update score and show overlay
+        document.getElementById('finalScore').textContent = `Final Score: ${this.score}`;
+        overlay.classList.add('visible');
+    }
+
+    initAudioControls() {
+        const masterVolumeSlider = document.getElementById('masterVolume');
+        const muteToggle = document.getElementById('muteToggle');
+
+        // Initialize volume slider
+        masterVolumeSlider.addEventListener('input', (e) => {
+            const volume = parseFloat(e.target.value);
+            this.soundSystem.setMasterVolume(volume);
+        });
+
+        // Initialize mute toggle
+        muteToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                this.soundSystem.mute();
+            } else {
+                this.soundSystem.unmute();
+            }
+        });
     }
 }
 

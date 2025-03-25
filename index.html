@@ -12,9 +12,33 @@
 </head>
 <body>
     <div class="game-container">
-        <div class="score-display">Score: <span id="score">0</span></div>
+        <div class="game-header">
+            <div class="score-display">Score: <span id="score">0</span></div>
+        </div>
         <div class="game-grid" id="gameGrid"></div>
         <div class="available-blocks" id="availableBlocks"></div>
+        <div class="audio-controls">
+            <div class="volume-control">
+                <label for="masterVolume">
+                    <i class="icon-volume"></i>
+                </label>
+                <input 
+                    type="range" 
+                    id="masterVolume" 
+                    min="0" 
+                    max="1" 
+                    step="0.1" 
+                    value="0.8"
+                >
+            </div>
+            <div class="mute-toggle">
+                <input 
+                    type="checkbox" 
+                    id="muteToggle"
+                >
+                <label for="muteToggle">Mute</label>
+            </div>
+        </div>
     </div>
 </body>
 </html>

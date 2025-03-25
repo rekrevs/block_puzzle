@@ -13,29 +13,24 @@
 ```javascript
 // Example block definition format
 {
-  id: "L3",           // Unique ID
-  baseShape: "L",     // Original shape type
-  color: "#0000FF",   // Block color (from predefined palette)
-  shape: [            // Shape matrix, normalized to top-left
-    [1, 0],
-    [1, 0],
-    [1, 1]
+  name: "Rectangle2x3",  // Updated block naming
+  color: "#4285F4",      // Updated color palette (Google colors)
+  shape: [               // Shape matrix, normalized to top-left
+    [1, 1, 1],
+    [1, 1, 1]
   ]
 }
 
-// Color palette
+// Updated Color Palette
 const BLOCK_COLORS = [
-  '#0000FF', // Blue
-  '#FF0000', // Red
-  '#FFFF00', // Yellow
-  '#00FF00', // Green
-  '#800080', // Purple
-  '#FFA500', // Orange
-  '#00FFFF'  // Cyan
+  '#4285F4', // Google Blue
+  '#EA4335', // Google Red
+  '#FBBC05', // Google Yellow
+  '#34A853'  // Google Green
 ]
 ```
 
-#### Base Block Shapes
+#### Block Shapes
 1. Square (2×2)
    ```
    XX
@@ -68,42 +63,43 @@ const BLOCK_COLORS = [
    XXXXX
    ```
 
-7. Hook Shape (3×2)
+7. Hook Shape (2×2)
    ```
    X
    XX
    ```
 
-8. Extended L (4×2)
+8. Extended L (3×3)
    ```
    XXX
    X
    X
    ```
 
-9. Square Plus (2×2)
+9. Large Square (3×3)
    ```
-   XX
-   XX
+   XXX
+   XXX
+   XXX
    ```
 
-10. Large Square (3×3)
-    ```
-    XXX
-    XXX
-    XXX
-    ```
-
-11. ZigZag (3×2)
+10. ZigZag (3×2)
     ```
     .XX
     XX.
     ```
 
-12. Rectangle (2×3)
+11. Rectangle (2×3)
     ```
     XXX
     XXX
+    ```
+
+12. T-Shape (3×2)
+    ```
+    X
+    XX
+    X
     ```
 
 ### Block Generation System
@@ -170,7 +166,8 @@ const BLOCK_COLORS = [
 - System proactively checks if any available block can be placed anywhere on the grid
 - If no valid placements are possible, game over is declared immediately
 - Check performed after each block placement and line clear
-- Display final score and offer restart option
+- Custom game over overlay with final score and play again button
+- Smooth transition animations for game over state
 
 ## Visual Design
 
@@ -204,21 +201,97 @@ const BLOCK_COLORS = [
    - Fade-in with slight scale effect
    - Subtle bounce on appearance
 
-## Audio System (Stubbed)
-
-### Sound Effect Types
+## Audio System
 ```javascript
-const SOUND_EFFECTS = {
-  BLOCK_PICKUP: 'pickup.mp3',
-  BLOCK_PLACE: 'plonk.mp3',
-  LINE_CLEAR: 'clear.mp3',
-  MULTI_CLEAR: 'multi_clear.mp3',
-  FULL_CLEAR: 'full_clear.mp3',
-  GAME_OVER: 'game_over.mp3'
-};
+const SOUND_TYPES = {
+    BLOCK_PLACE: 'block_place',
+    BLOCK_INVALID: 'block_invalid',
+    LINE_CLEAR: 'line_clear',
+    MULTI_LINE_CLEAR: 'multi_line_clear',
+    GAME_OVER: 'game_over',
+    MENU_SELECT: 'menu_select',
+    MUSIC_MAIN: 'music_main',
+    MUSIC_GAME_OVER: 'music_game_over'
+}
+
+const SOUND_PATHS = {
+    [SOUND_TYPES.BLOCK_PLACE]: 'sounds/effects/block_place.mp3',
+    [SOUND_TYPES.BLOCK_INVALID]: 'sounds/effects/block_invalid.mp3',
+    [SOUND_TYPES.LINE_CLEAR]: 'sounds/effects/line_clear.mp3',
+    [SOUND_TYPES.MULTI_LINE_CLEAR]: 'sounds/effects/multi_line_clear.mp3',
+    [SOUND_TYPES.GAME_OVER]: 'sounds/effects/game_over.mp3',
+    [SOUND_TYPES.MENU_SELECT]: 'sounds/effects/menu_select.mp3',
+    [SOUND_TYPES.MUSIC_MAIN]: 'sounds/music/main_theme.mp3',
+    [SOUND_TYPES.MUSIC_GAME_OVER]: 'sounds/music/game_over.mp3'
+}
 ```
 
-## Technical Implementation
+### Audio System Configuration
+- Master volume control
+- Independent music and sound effect volume settings
+- Mute/Unmute functionality
+- Persistent volume settings across game sessions
+
+### Volume Control Methods
+```javascript
+// Volume control example
+const soundSystem = new SoundSystem();
+
+// Set master volume (0.0 - 1.0)
+soundSystem.setMasterVolume(0.8);
+
+// Set music volume independently
+soundSystem.setMusicVolume(0.3);  // Reduced volume for main theme
+
+// Set sound effects volume
+soundSystem.setSoundEffectsVolume(0.7);
+
+// Mute/Unmute controls
+soundSystem.mute();        // Mute all sounds
+soundSystem.unmute();      // Restore previous volume
+soundSystem.toggleMute();  // Switch between muted and unmuted
+```
+
+### User Interface Audio Controls
+- Master volume slider (0-100%)
+- Mute toggle button
+- Persistent volume settings
+- Intuitive, minimalist design
+- Accessibility considerations
+
+#### Volume Control UI Components
+```html
+<div class="audio-controls">
+    <div class="volume-control">
+        <label for="masterVolume">
+            <i class="icon-volume"></i>
+        </label>
+        <input 
+            type="range" 
+            id="masterVolume" 
+            min="0" 
+            max="1" 
+            step="0.1" 
+            value="0.8"
+        >
+    </div>
+    <div class="mute-toggle">
+        <input 
+            type="checkbox" 
+            id="muteToggle"
+        >
+        <label for="muteToggle">Mute</label>
+    </div>
+</div>
+```
+
+#### Volume Control Interaction
+- Slider adjusts master volume in real-time
+- Mute toggle immediately silences/restores audio
+- Volume state persists across game sessions
+- Smooth, animated volume transitions
+
+### Technical Implementation
 
 ### Required Libraries
 1. Core Framework
@@ -240,6 +313,14 @@ const SOUND_EFFECTS = {
 - Modern browsers (last 2 versions)
 - Mobile-first responsive design
 - Touch and mouse input support
+
+### Responsive Design
+- Adaptive grid sizing for different screen sizes
+- Media queries for mobile optimization (500px and 400px breakpoints)
+- Tile tray with proper overflow handling
+- Audio controls positioned below tile tray
+- Column-oriented layout for audio controls on narrow screens
+- Hardware accelerated animations for better mobile performance
 
 ### Performance Considerations
 - Efficient block collision detection

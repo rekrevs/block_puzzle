@@ -34,8 +34,9 @@ export class SoundSystem {
         this.sounds = {};
         this.music = {};
         this.isMuted = false;
-        this.musicVolume = 0.5;
-        this.soundVolume = 0.7;
+        this.musicVolume = 0.2;  
+        this.soundVolume = 0.5;
+        this.masterVolume = 1.0;
         
         // Check if Howler is available
         if (typeof Howl === 'undefined') {
@@ -52,27 +53,27 @@ export class SoundSystem {
             this.sounds = {
                 [SOUND_TYPES.BLOCK_PLACE]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.BLOCK_PLACE]],
-                    volume: this.soundVolume
+                    volume: this.soundVolume * this.masterVolume
                 }),
                 [SOUND_TYPES.BLOCK_INVALID]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.BLOCK_INVALID]],
-                    volume: this.soundVolume
+                    volume: this.soundVolume * this.masterVolume
                 }),
                 [SOUND_TYPES.LINE_CLEAR]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.LINE_CLEAR]],
-                    volume: this.soundVolume
+                    volume: this.soundVolume * this.masterVolume
                 }),
                 [SOUND_TYPES.MULTI_LINE_CLEAR]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.MULTI_LINE_CLEAR]],
-                    volume: this.soundVolume
+                    volume: this.soundVolume * this.masterVolume
                 }),
                 [SOUND_TYPES.GAME_OVER]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.GAME_OVER]],
-                    volume: this.soundVolume
+                    volume: this.soundVolume * this.masterVolume
                 }),
                 [SOUND_TYPES.MENU_SELECT]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.MENU_SELECT]],
-                    volume: this.soundVolume
+                    volume: this.soundVolume * this.masterVolume
                 })
             };
             
@@ -80,12 +81,12 @@ export class SoundSystem {
             this.music = {
                 [SOUND_TYPES.MUSIC_MAIN]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.MUSIC_MAIN]],
-                    volume: this.musicVolume,
+                    volume: this.musicVolume * this.masterVolume,
                     loop: true
                 }),
                 [SOUND_TYPES.MUSIC_GAME_OVER]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.MUSIC_GAME_OVER]],
-                    volume: this.musicVolume,
+                    volume: this.musicVolume * this.masterVolume,
                     loop: false
                 })
             };
@@ -135,6 +136,49 @@ export class SoundSystem {
         console.log('SoundSystem: Initialized with stubs');
     }
     
+    // New volume control methods
+    setMasterVolume(volume) {
+        // Validate volume is between 0 and 1
+        this.masterVolume = Math.max(0, Math.min(1, volume));
+        this.updateAllVolumes();
+    }
+
+    setMusicVolume(volume) {
+        this.musicVolume = Math.max(0, Math.min(1, volume));
+        this.updateAllVolumes();
+    }
+
+    setSoundEffectsVolume(volume) {
+        this.soundVolume = Math.max(0, Math.min(1, volume));
+        this.updateAllVolumes();
+    }
+
+    mute() {
+        this.isMuted = true;
+        this.updateAllVolumes();
+    }
+
+    unmute() {
+        this.isMuted = false;
+        this.updateAllVolumes();
+    }
+
+    toggleMute() {
+        this.isMuted = !this.isMuted;
+        this.updateAllVolumes();
+    }
+
+    updateAllVolumes() {
+        // Update volumes for all sounds and music
+        Object.values(this.sounds).forEach(sound => {
+            sound.volume(this.isMuted ? 0 : this.soundVolume * this.masterVolume);
+        });
+
+        Object.values(this.music).forEach(music => {
+            music.volume(this.isMuted ? 0 : this.musicVolume * this.masterVolume);
+        });
+    }
+
     // Play a sound effect
     playSound(soundType) {
         if (this.isMuted) return;
@@ -179,63 +223,6 @@ export class SoundSystem {
                 }
             }
         });
-    }
-    
-    // Toggle mute for all sounds and music
-    toggleMute() {
-        this.isMuted = !this.isMuted;
-        console.log(`SoundSystem: Sound ${this.isMuted ? 'muted' : 'unmuted'}`);
-        
-        if (this.isMuted) {
-            this.stopAllMusic();
-        }
-        
-        // If using Howler, update all sound volumes
-        if (typeof Howl !== 'undefined') {
-            Object.values(this.sounds).forEach(sound => {
-                if (sound && typeof sound.volume === 'function') {
-                    sound.volume(this.isMuted ? 0 : this.soundVolume);
-                }
-            });
-            
-            Object.values(this.music).forEach(track => {
-                if (track && typeof track.volume === 'function') {
-                    track.volume(this.isMuted ? 0 : this.musicVolume);
-                }
-            });
-        }
-        
-        return this.isMuted;
-    }
-    
-    // Set volume for sound effects
-    setSoundVolume(volume) {
-        this.soundVolume = Math.max(0, Math.min(1, volume));
-        console.log(`SoundSystem: Sound volume set to ${this.soundVolume}`);
-        
-        // Update volume for all sound effects if using Howler
-        if (!this.isMuted && typeof Howl !== 'undefined') {
-            Object.values(this.sounds).forEach(sound => {
-                if (sound && typeof sound.volume === 'function') {
-                    sound.volume(this.soundVolume);
-                }
-            });
-        }
-    }
-    
-    // Set volume for music
-    setMusicVolume(volume) {
-        this.musicVolume = Math.max(0, Math.min(1, volume));
-        console.log(`SoundSystem: Music volume set to ${this.musicVolume}`);
-        
-        // Update volume for all music if using Howler
-        if (!this.isMuted && typeof Howl !== 'undefined') {
-            Object.values(this.music).forEach(track => {
-                if (track && typeof track.volume === 'function') {
-                    track.volume(this.musicVolume);
-                }
-            });
-        }
     }
 }
 
