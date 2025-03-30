@@ -29,8 +29,9 @@ const SOUND_PATHS = {
 };
 
 export class SoundSystem {
-    constructor() {
+    constructor(gameStateManager) {
         console.log('SoundSystem: Initializing...');
+        this.gameStateManager = gameStateManager;
         this.sounds = {};
         this.music = {};
         this.isMuted = false;
@@ -51,30 +52,12 @@ export class SoundSystem {
         try {
             // Initialize sound effects with Howler
             this.sounds = {
-                [SOUND_TYPES.BLOCK_PLACE]: new Howl({
-                    src: [SOUND_PATHS[SOUND_TYPES.BLOCK_PLACE]],
-                    volume: this.soundVolume * this.masterVolume
-                }),
-                [SOUND_TYPES.BLOCK_INVALID]: new Howl({
-                    src: [SOUND_PATHS[SOUND_TYPES.BLOCK_INVALID]],
-                    volume: this.soundVolume * this.masterVolume
-                }),
-                [SOUND_TYPES.LINE_CLEAR]: new Howl({
-                    src: [SOUND_PATHS[SOUND_TYPES.LINE_CLEAR]],
-                    volume: this.soundVolume * this.masterVolume
-                }),
-                [SOUND_TYPES.MULTI_LINE_CLEAR]: new Howl({
-                    src: [SOUND_PATHS[SOUND_TYPES.MULTI_LINE_CLEAR]],
-                    volume: this.soundVolume * this.masterVolume
-                }),
-                [SOUND_TYPES.GAME_OVER]: new Howl({
-                    src: [SOUND_PATHS[SOUND_TYPES.GAME_OVER]],
-                    volume: this.soundVolume * this.masterVolume
-                }),
-                [SOUND_TYPES.MENU_SELECT]: new Howl({
-                    src: [SOUND_PATHS[SOUND_TYPES.MENU_SELECT]],
-                    volume: this.soundVolume * this.masterVolume
-                })
+                [SOUND_TYPES.BLOCK_PLACE]: this.loadSound(SOUND_TYPES.BLOCK_PLACE, SOUND_PATHS[SOUND_TYPES.BLOCK_PLACE]),
+                [SOUND_TYPES.BLOCK_INVALID]: this.loadSound(SOUND_TYPES.BLOCK_INVALID, SOUND_PATHS[SOUND_TYPES.BLOCK_INVALID]),
+                [SOUND_TYPES.LINE_CLEAR]: this.loadSound(SOUND_TYPES.LINE_CLEAR, SOUND_PATHS[SOUND_TYPES.LINE_CLEAR]),
+                [SOUND_TYPES.MULTI_LINE_CLEAR]: this.loadSound(SOUND_TYPES.MULTI_LINE_CLEAR, SOUND_PATHS[SOUND_TYPES.MULTI_LINE_CLEAR]),
+                [SOUND_TYPES.GAME_OVER]: this.loadSound(SOUND_TYPES.GAME_OVER, SOUND_PATHS[SOUND_TYPES.GAME_OVER]),
+                [SOUND_TYPES.MENU_SELECT]: this.loadSound(SOUND_TYPES.MENU_SELECT, SOUND_PATHS[SOUND_TYPES.MENU_SELECT])
             };
             
             // Initialize music with Howler
@@ -97,6 +80,21 @@ export class SoundSystem {
         }
     }
     
+    loadSound(key, path) {
+        try {
+            return new Howl({
+                src: [path],
+                volume: this.soundVolume * this.masterVolume,
+                onloaderror: () => {
+                    this.gameStateManager.setError(`Failed to load sound: ${key}`);
+                }
+            });
+        } catch (error) {
+            this.gameStateManager.setError(`Sound initialization error: ${error.message}`);
+            return null;
+        }
+    }
+
     initSoundStubs() {
         // Fallback stub implementations for sounds
         this.sounds = {
@@ -171,25 +169,33 @@ export class SoundSystem {
     updateAllVolumes() {
         // Update volumes for all sounds and music
         Object.values(this.sounds).forEach(sound => {
-            sound.volume(this.isMuted ? 0 : this.soundVolume * this.masterVolume);
+            if (sound.volume) {
+                sound.volume(this.isMuted ? 0 : this.soundVolume * this.masterVolume);
+            }
         });
 
         Object.values(this.music).forEach(music => {
-            music.volume(this.isMuted ? 0 : this.musicVolume * this.masterVolume);
+            if (music.volume) {
+                music.volume(this.isMuted ? 0 : this.musicVolume * this.masterVolume);
+            }
         });
     }
 
     // Play a sound effect
     playSound(soundType) {
-        if (this.isMuted) return;
-        
-        const sound = this.sounds[soundType];
-        if (sound) {
-            if (typeof sound.play === 'function') {
-                sound.play();
+        try {
+            if (this.isMuted) return;
+            
+            const sound = this.sounds[soundType];
+            if (sound) {
+                if (typeof sound.play === 'function') {
+                    sound.play();
+                }
+            } else {
+                console.warn(`SoundSystem: Sound ${soundType} not found`);
             }
-        } else {
-            console.warn(`SoundSystem: Sound ${soundType} not found`);
+        } catch (error) {
+            this.gameStateManager.setError(`Sound playback error: ${error.message}`);
         }
     }
     

@@ -1,6 +1,9 @@
 import { BlockSystem } from './blockSystem.js';
 import { GridSystem } from './gridSystem.js';
 import { SoundSystem, SOUND_TYPES } from './soundSystem.js';
+import GameStateManager from './GameStateManager.js';
+
+const gameStateManager = new GameStateManager();
 
 class Game {
     constructor() {
