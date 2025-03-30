@@ -77,10 +77,9 @@ body {
     overflow: visible; /* Ensure blocks can be visible outside the container */
 }
 
-.block {
-    display: grid;
-    cursor: grab;
+.block-group {
     position: relative;
+    cursor: grab;
     touch-action: none;
     transition: none; /* Remove transition for instant response */
     will-change: transform;
@@ -88,27 +87,65 @@ body {
     z-index: 10; /* Higher than grid */ 
     background: transparent;
     border: none;
+    outline: none;
+    box-shadow: none !important;
+    /* Disable all drag-related behaviors - use standard properties */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    /* Using standard properties instead of non-standard user-drag */
+    pointer-events: auto;
+    transform-origin: center center;
 }
 
 .block-cell {
+    position: absolute; /* Ensure cells are absolutely positioned */
     width: var(--grid-size);
     height: var(--grid-size);
     transition: background-color 0.2s;
     box-sizing: border-box;
     border: none;
+    outline: none;
+    border-radius: 2px; /* Slightly rounded corners */
+    /* Disable all drag-related behaviors - use standard properties */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    /* Using standard properties instead of non-standard user-drag */
+    pointer-events: auto;
 }
 
-.block.dragging {
-    cursor: grabbing;
+.block-group.dragging {
+    /* Visibility and positioning */
+    cursor: grabbing !important;
     opacity: 0.95;
     z-index: 9999; /* Very high to ensure it's above everything */
-    pointer-events: none;
-    transform-origin: center center;
-    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.25); /* Stronger shadow for better visual separation */
-    transition: none !important; /* Force no transition */
-    outline: none;
+    
+    /* Eliminate any shadows or outlines */
+    box-shadow: none !important;
+    outline: none !important;
     border: none;
     background: transparent;
+    filter: drop-shadow(0px 0px 0px transparent) !important;
+    
+    /* Performance and animation */
+    will-change: transform;
+    transition: none !important;
+    transform-origin: center center;
+}
+
+.block-group.dragging .block-cell {
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23); /* Material design shadow */
+}
+
+/* Used for snap-back animation when placement is invalid */
+.block-group.snap-back {
+    transition: transform 0.2s ease-out !important;
+    transform: none !important;
+    opacity: 1;
+    cursor: grab;
 }
 
 .preview {

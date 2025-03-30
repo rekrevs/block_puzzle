@@ -27,6 +27,10 @@ class Game {
         // Then set up the game
         this.setupGame();
         console.log('Game: Setup complete');
+        
+        // Set up animation frame handling
+        this.lastTime = 0;
+        this.setupAnimationLoop();
     }
 
     setupGame() {
@@ -75,53 +79,79 @@ class Game {
     }
 
     createBlockElement(block) {
-        const container = document.createElement('div');
-        container.className = 'block';
-        container.dataset.blockId = block.id;
+        // Create a BlockGroup element - a wrapper for cells with no bounding box
+        const blockGroup = document.createElement('div');
+        blockGroup.className = 'block-group';
+        blockGroup.dataset.blockId = block.id;
         
-        // Calculate the total size of the block
+        // Store block dimensions and properties
         const rows = block.shape.length;
         const cols = block.shape[0].length;
+        const cellSize = 40; // 40px is --grid-size
         
-        // Create a wrapper with no visible boundaries
-        container.style.position = 'relative';
-        container.style.background = 'transparent';
-        container.style.border = 'none';
-        container.style.outline = 'none';
-        container.style.width = `${cols * 40}px`; // 40px is --grid-size
-        container.style.height = `${rows * 40}px`;
+        // Add metadata about shape to the group
+        blockGroup.dataset.rows = rows;
+        blockGroup.dataset.cols = cols;
+                
+        // Track filled cell positions to calculate center and bounds
+        const filledCells = [];
         
-        // Create a grid for better alignment with no visible boundaries
-        container.style.display = 'grid';
-        container.style.gridTemplateRows = `repeat(${rows}, 40px)`;
-        container.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
-        container.style.gap = '0';
-        
-        // Only create cells for filled spaces
+        // Create individual cell elements - no container with empty spaces
         for (let i = 0; i < block.shape.length; i++) {
             for (let j = 0; j < block.shape[i].length; j++) {
                 if (block.shape[i][j] === 1) {
+                    // Create cell with correct styling
                     const cell = document.createElement('div');
                     cell.className = 'block-cell';
                     cell.style.backgroundColor = block.color;
-                    cell.style.gridRow = `${i + 1}`;
-                    cell.style.gridColumn = `${j + 1}`;
+                    cell.style.width = `${cellSize}px`;
+                    cell.style.height = `${cellSize}px`;
+                    cell.style.position = 'absolute';
+                    cell.style.left = `${j * cellSize}px`;
+                    cell.style.top = `${i * cellSize}px`;
                     cell.style.border = 'none';
                     cell.style.outline = 'none';
-                    container.appendChild(cell);
+                    
+                    // Save position data for calculations
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    filledCells.push({row: i, col: j});
+                    
+                    // Add to block group
+                    blockGroup.appendChild(cell);
                 }
             }
         }
-
-        return container;
+        
+        // Get the overall block dimensions for proper positioning
+        const top = Math.min(...filledCells.map(cell => cell.row)) * cellSize;
+        const left = Math.min(...filledCells.map(cell => cell.col)) * cellSize;
+        const right = (Math.max(...filledCells.map(cell => cell.col)) + 1) * cellSize;
+        const bottom = (Math.max(...filledCells.map(cell => cell.row)) + 1) * cellSize;
+        
+        // Calculate exact width and height of the actual shape (not the bounding box)
+        const width = right - left;
+        const height = bottom - top;
+        
+        // Make the group match the shape's exact dimensions
+        blockGroup.style.width = `${width}px`;
+        blockGroup.style.height = `${height}px`;
+        blockGroup.style.position = 'relative';
+        blockGroup.style.cursor = 'grab';
+        
+        // Store important data for dragging
+        blockGroup.dataset.width = width;
+        blockGroup.dataset.height = height;
+        
+        return blockGroup;
     }
 
     setupDragAndDrop() {
         // Remove any existing interact instances
-        const blocks = document.querySelectorAll('.block');
-        blocks.forEach(block => {
-            if (block._interact) {
-                block._interact.unset();
+        const blockGroups = document.querySelectorAll('.block-group');
+        blockGroups.forEach(blockGroup => {
+            if (blockGroup._interact) {
+                blockGroup._interact.unset();
             }
         });
 
@@ -130,10 +160,11 @@ class Game {
         this.draggingElement = null;
         this.draggingBlockIndex = undefined;
 
-        interact('.block').draggable({
+        interact('.block-group').draggable({
             inertia: false,
             autoScroll: true,
-            allowFrom: '.block',
+            allowFrom: '.block-group, .block-cell',
+            ignoreFrom: 'img', // Ignore any images that might create ghosts
             modifiers: [
                 interact.modifiers.restrict({
                     restriction: '.game-container'
@@ -141,19 +172,36 @@ class Game {
             ],
             listeners: {
                 start: event => {
+                    // Prevent default browser behavior and stop propagation
+                    event.preventDefault();
+                    event.stopPropagation();
+                    
                     // Ensure we're not already dragging something
                     if (this.draggingBlock || this.draggingElement) {
                         this.draggingBlock = null;
                         this.draggingElement = null;
                         this.draggingBlockIndex = undefined;
+                        // Reset any previous transforms
+                        this.dragX = undefined;
+                        this.dragY = undefined;
+                        this._lastDragX = undefined;
+                        this._lastDragY = undefined;
                     }
                     
+                    // Add dragging class to enable additional CSS - all styling should be in CSS
+                    event.target.classList.add('dragging');
+                    
+                    // Call our drag start handler
                     this.onDragStart(event);
-                    // Ensure immediate response
-                    event.target.style.willChange = 'transform';
-                    event.target.style.transition = 'none';
+                    
+                    // Mark the start time for performance tracking
+                    this.dragStartTime = performance.now();
                 },
                 move: event => {
+                    // Prevent default browser behavior and stop propagation
+                    event.preventDefault();
+                    event.stopPropagation();
+                    
                     // Skip if we lost track of dragging element
                     if (!this.draggingElement || !this.draggingBlock) return;
                     
@@ -161,33 +209,54 @@ class Game {
                     const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
                     const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
                     
-                    // Direct transform without requestAnimationFrame for immediate response
-                    target.style.transform = `translate(${x}px, ${y}px)`;
+                    // Store the values to use in animation frame
+                    this.dragX = x;
+                    this.dragY = y;
                     target.setAttribute('data-x', x);
                     target.setAttribute('data-y', y);
+                    
+                    // Let the animation frame handle transform updates for better performance
+                    // This delegates the actual DOM update to our optimized animation loop
                     
                     // Call our move handler for grid preview
                     this.onDragMove(event);
                 },
                 end: event => {
-                    event.target.style.willChange = 'auto';
+                    // Prevent default browser behavior and stop propagation
+                    event.preventDefault();
+                    event.stopPropagation();
+                    
+                    // Remove the dragging class
+                    event.target.classList.remove('dragging');
+                    
+                    // Handle drag end logic
                     this.onDragEnd(event);
                     
-                    // Force reset the element's transform
-                    event.target.style.transform = 'none';
-                    event.target.setAttribute('data-x', 0);
-                    event.target.setAttribute('data-y', 0);
+                    // Reset drag tracking variables
+                    this.dragX = undefined;
+                    this.dragY = undefined;
+                    this._lastDragX = undefined;
+                    this._lastDragY = undefined;
+                    
+                    // Use CSS class for consistent handling of transform reset
+                    // We'll remove it after a short delay to allow for any animations
+                    event.target.classList.add('snap-back');
+                    setTimeout(() => {
+                        event.target.classList.remove('snap-back');
+                        event.target.setAttribute('data-x', 0);
+                        event.target.setAttribute('data-y', 0);
+                    }, 200); // Longer timeout to match transition duration in CSS
                 }
             }
         });
     }
 
     onDragStart(event) {
-        // Ensure we're starting with the block element
-        const blockElement = event.target.closest('.block');
-        if (!blockElement) return;
+        // Ensure we're starting with the block group element
+        const blockGroupElement = event.target.closest('.block-group');
+        if (!blockGroupElement) return;
         
-        const blockIndex = parseInt(blockElement.dataset.blockIndex);
+        const blockIndex = parseInt(blockGroupElement.dataset.blockIndex);
         console.log('Drag start - Block index:', blockIndex, 'Available blocks:', this.availableBlocks);
         
         if (blockIndex >= 0 && blockIndex < this.availableBlocks.length) {
@@ -200,14 +269,24 @@ class Game {
                 color: block.color
             };
             
-            this.draggingElement = blockElement;
+            this.draggingElement = blockGroupElement;
             this.draggingBlockIndex = blockIndex;
-            blockElement.classList.add('dragging');
+            blockGroupElement.classList.add('dragging');
+            
+            // Apply styles for better dragging experience
+            blockGroupElement.style.zIndex = '100';
+            
+            // Add transition to all cells for smoother movement
+            const cells = blockGroupElement.querySelectorAll('.block-cell');
+            cells.forEach(cell => {
+                cell.style.transition = 'none';
+                cell.style.willChange = 'transform';
+            });
             
             // Store initial position
-            const rect = blockElement.getBoundingClientRect();
-            blockElement._initialX = rect.left;
-            blockElement._initialY = rect.top;
+            const rect = blockGroupElement.getBoundingClientRect();
+            blockGroupElement._initialX = rect.left;
+            blockGroupElement._initialY = rect.top;
             
             console.log('Started dragging block:', this.draggingBlock);
         } else {
@@ -362,9 +441,8 @@ class Game {
                 this.checkForGameOver();
             }
         } else {
-            // Instant snap back to original position
-            target.style.transition = 'none';
-            target.style.transform = 'none';
+            // Instant snap back to original position - use class for consistent styling
+            target.classList.add('snap-back');
             target.setAttribute('data-x', 0);
             target.setAttribute('data-y', 0);
             
@@ -378,8 +456,14 @@ class Game {
             if (blockContainer && !blockContainer.contains(target)) {
                 blockContainer.appendChild(target);
             }
+            
+            // Remove any snap-back class after a delay to allow animation to complete
+            setTimeout(() => {
+                target.classList.remove('snap-back');
+            }, 200);
         }
 
+        // Final cleanup of drag state
         target.classList.remove('dragging');
         this.draggingBlock = null;
         this.draggingElement = null;
@@ -429,6 +513,9 @@ class Game {
         this.soundSystem.playSound(SOUND_TYPES.GAME_OVER);
         this.soundSystem.playMusic(SOUND_TYPES.MUSIC_GAME_OVER);
         
+        // Properly clean up resources before showing game over
+        this.cleanup();
+        
         // Create game over overlay if it doesn't exist
         let overlay = document.getElementById('gameOverOverlay');
         if (!overlay) {
@@ -454,9 +541,7 @@ class Game {
                 overlay.classList.remove('visible');
                 // Reset game after a brief delay for animation
                 setTimeout(() => {
-                    this.gridSystem = new GridSystem(8, 8);
-                    this.score = 0;
-                    this.setupGame();
+                    this.resetGame();
                 }, 300);
             });
             
@@ -465,6 +550,19 @@ class Game {
             content.appendChild(restartBtn);
             overlay.appendChild(content);
             document.body.appendChild(overlay);
+        } else {
+            // If overlay exists, ensure we don't have multiple listeners
+            const restartBtn = overlay.querySelector('.restart-button');
+            if (restartBtn) {
+                const newRestartBtn = restartBtn.cloneNode(true);
+                newRestartBtn.addEventListener('click', () => {
+                    overlay.classList.remove('visible');
+                    setTimeout(() => {
+                        this.resetGame();
+                    }, 300);
+                });
+                restartBtn.parentNode.replaceChild(newRestartBtn, restartBtn);
+            }
         }
         
         // Update score and show overlay
@@ -490,6 +588,114 @@ class Game {
                 this.soundSystem.unmute();
             }
         });
+    }
+
+    setupAnimationLoop() {
+        // Start the animation loop
+        const animate = (currentTime) => {
+            // Calculate delta time
+            const deltaTime = currentTime - (this.lastTime || currentTime);
+            this.lastTime = currentTime;
+            
+            // Update any animations
+            this.updateAnimations(deltaTime);
+            
+            // Continue the loop
+            this.animationFrameId = requestAnimationFrame(animate);
+        };
+        
+        this.animationFrameId = requestAnimationFrame(animate);
+    }
+    
+    stopAnimationLoop() {
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+    
+    updateAnimations(deltaTime) {
+        // Handle drag animations - Only update if the position has changed
+        if (this.draggingElement && this.dragX !== undefined && this.dragY !== undefined) {
+            // Store last position to avoid unnecessary DOM updates
+            if (this._lastDragX !== this.dragX || this._lastDragY !== this.dragY) {
+                // Update block position with requestAnimationFrame for smoother movement
+                this.draggingElement.style.transform = `translate(${this.dragX}px, ${this.dragY}px)`;
+                // Store last position
+                this._lastDragX = this.dragX;
+                this._lastDragY = this.dragY;
+            }
+        }
+        
+        // Could add other animations here in the future
+    }
+    
+    // Reset the game to its initial state
+    resetGame() {
+        console.log('Game: Resetting game state...');
+        
+        // Ensure proper cleanup before creating new game components
+        this.cleanup();
+        
+        // Reset grid system
+        this.gridSystem = new GridSystem(8, 8);
+        
+        // Reset score
+        this.score = 0;
+        
+        // Clear block container
+        const blockContainer = document.getElementById('availableBlocks');
+        if (blockContainer) {
+            blockContainer.innerHTML = '';
+        }
+        
+        // Reinitialize the game
+        this.setupGame();
+        
+        // Make sure animation loop is running
+        if (!this.animationFrameId) {
+            this.setupAnimationLoop();
+        }
+        
+        console.log('Game: Reset complete');
+    }
+    
+    // Clean up all resources and event handlers
+    cleanup() {
+        console.log('Game: Cleaning up resources...');
+        // Stop animation loop
+        this.stopAnimationLoop();
+        
+        // Remove any interact instances
+        const blockGroups = document.querySelectorAll('.block-group');
+        blockGroups.forEach(blockGroup => {
+            if (blockGroup._interact) {
+                blockGroup._interact.unset();
+            }
+        });
+        
+        // Clear audio event listeners
+        const masterVolumeSlider = document.getElementById('masterVolume');
+        const muteToggle = document.getElementById('muteToggle');
+        
+        if (masterVolumeSlider) {
+            const newSlider = masterVolumeSlider.cloneNode(true);
+            masterVolumeSlider.parentNode.replaceChild(newSlider, masterVolumeSlider);
+        }
+        
+        if (muteToggle) {
+            const newToggle = muteToggle.cloneNode(true);
+            muteToggle.parentNode.replaceChild(newToggle, muteToggle);
+        }
+        
+        // Reset game state
+        this.draggingBlock = null;
+        this.draggingElement = null;
+        this.draggingBlockIndex = undefined;
+        this.dragX = undefined;
+        this.dragY = undefined;
+        this._lastDragX = undefined;
+        this._lastDragY = undefined;
     }
 }
 
