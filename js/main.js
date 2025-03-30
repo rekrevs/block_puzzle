@@ -20,6 +20,7 @@ class Game {
         this.availableBlocks = [];
         this.draggingBlock = null;
         this.draggingElement = null;
+        this.pendingGameOverCheck = false;
         
         // Initialize audio controls before game setup
         this.initAudioControls();
@@ -74,8 +75,8 @@ class Game {
         // Re-setup drag and drop for new blocks
         this.setupDragAndDrop();
         
-        // Check if any block can be placed, if not, game over
-        this.checkForGameOver();
+        // Schedule a game over check after generating new blocks
+        this.scheduleGameOverCheck();
     }
 
     createBlockElement(block) {
@@ -433,13 +434,11 @@ class Game {
             if (this.availableBlocks.length === 0) {
                 setTimeout(() => {
                     this.generateNewBlocks();
-                    // The checkForGameOver is now called inside generateNewBlocks
+                    // Game over check will happen after blocks are visible
                 }, 100); // Small delay to ensure clean transition
             }
-            // If we still have blocks, check if any can be placed
-            else {
-                this.checkForGameOver();
-            }
+            // Schedule a game over check after a successful move
+            this.scheduleGameOverCheck();
         } else {
             // Instant snap back to original position - use class for consistent styling
             target.classList.add('snap-back');
@@ -630,6 +629,22 @@ class Game {
         // Could add other animations here in the future
     }
     
+    /**
+     * Schedule a game over check with a delay
+     * This ensures the user can see new blocks before the game possibly ends
+     */
+    scheduleGameOverCheck() {
+        // Only schedule if no check is already pending
+        if (!this.pendingGameOverCheck) {
+            this.pendingGameOverCheck = true;
+            setTimeout(() => {
+                // Check if any block can be placed, if not, game over
+                this.checkForGameOver();
+                this.pendingGameOverCheck = false;
+            }, 500); // Half-second delay - enough to see blocks but not disrupt gameplay
+        }
+    }
+    
     // Reset the game to its initial state
     resetGame() {
         console.log('Game: Resetting game state...');
@@ -640,8 +655,9 @@ class Game {
         // Reset grid system
         this.gridSystem = new GridSystem(8, 8);
         
-        // Reset score
+        // Reset score and game state flags
         this.score = 0;
+        this.pendingGameOverCheck = false;
         
         // Clear block container
         const blockContainer = document.getElementById('availableBlocks');
