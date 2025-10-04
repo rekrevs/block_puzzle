@@ -17,11 +17,25 @@ class Game {
         console.log('Game: SoundSystem created');
         console.log('Game: GridSystem created');
         this.score = 0;
+        this.cellSize = 40; // Keep in sync with --grid-size in CSS
+        this.gameStateManager = gameStateManager;
+        this.isGameOver = false;
+        this.gameOverTimeoutId = null;
+        this.blockInteractable = null;
         this.availableBlocks = [];
         this.draggingBlock = null;
         this.draggingElement = null;
+        this.draggingBlockCenter = null;
         this.pendingGameOverCheck = false;
-        
+
+        this.gameStateManager.updateState({
+            score: this.score,
+            isGameOver: false,
+            availableBlocks: [],
+            draggingBlockId: null,
+            pendingGameOverCheck: false
+        });
+
         // Initialize audio controls before game setup
         this.initAudioControls();
         
@@ -43,6 +57,10 @@ class Game {
     }
 
     generateNewBlocks() {
+        if (this.isGameOver) {
+            return;
+        }
+
         console.log('Game: Generating new blocks...');
         const blockContainer = document.getElementById('availableBlocks');
         if (!blockContainer) {
@@ -72,6 +90,8 @@ class Game {
             blockContainer.appendChild(blockElement);
         });
 
+        this.updateAvailableBlocksState();
+
         // Re-setup drag and drop for new blocks
         this.setupDragAndDrop();
         
@@ -88,7 +108,7 @@ class Game {
         // Store block dimensions and properties
         const rows = block.shape.length;
         const cols = block.shape[0].length;
-        const cellSize = 40; // 40px is --grid-size
+        const cellSize = this.cellSize; // 40px is --grid-size
         
         // Add metadata about shape to the group
         blockGroup.dataset.rows = rows;
@@ -148,20 +168,22 @@ class Game {
     }
 
     setupDragAndDrop() {
-        // Remove any existing interact instances
-        const blockGroups = document.querySelectorAll('.block-group');
-        blockGroups.forEach(blockGroup => {
-            if (blockGroup._interact) {
-                blockGroup._interact.unset();
-            }
-        });
+        // Tear down any existing interactable before configuring a new one
+        if (this.blockInteractable) {
+            this.blockInteractable.unset();
+            this.blockInteractable = null;
+        }
 
         // Reset any lingering dragging state
         this.draggingBlock = null;
         this.draggingElement = null;
         this.draggingBlockIndex = undefined;
+        this.draggingBlockCenter = null;
+        this.gameStateManager.updateState({ draggingBlockId: null });
 
-        interact('.block-group').draggable({
+        this.blockInteractable = interact('.block-group');
+
+        this.blockInteractable.draggable({
             inertia: false,
             autoScroll: true,
             allowFrom: '.block-group, .block-cell',
@@ -272,6 +294,8 @@ class Game {
             
             this.draggingElement = blockGroupElement;
             this.draggingBlockIndex = blockIndex;
+            this.draggingBlockCenter = this.calculateBlockCenterOffset(this.draggingBlock);
+            this.gameStateManager.updateState({ draggingBlockId: block.id });
             blockGroupElement.classList.add('dragging');
             
             // Apply styles for better dragging experience
@@ -301,43 +325,31 @@ class Game {
         // Skip the transform calculation since it's already done in the interact move handler
         // This makes the preview update faster
 
-        // Calculate grid position using the upper-left corner of the block
-        const gridRect = this.gridSystem.element.getBoundingClientRect();
+        // Calculate grid position using center-based snapping
         const targetRect = this.draggingElement.getBoundingClientRect();
-        
-        const cellSize = 40; // var(--grid-size)
-        
-        // Get the upper-left corner coordinates
-        const upperLeftX = targetRect.left;
-        const upperLeftY = targetRect.top;
-        
-        // Calculate relative position to the grid
-        const relativeX = upperLeftX - gridRect.left;
-        const relativeY = upperLeftY - gridRect.top;
-        
-        // Round to the nearest grid cell
-        const gridX = Math.round(relativeX / cellSize);
-        const gridY = Math.round(relativeY / cellSize);
-        
+        const snappedPosition = this.getSnappedGridPosition(targetRect);
+        if (!snappedPosition) {
+            this.gridSystem.clearPreview();
+            return;
+        }
+
+        const { gridX, gridY } = snappedPosition;
+
         // Block dimensions
         const blockRows = this.draggingBlock.shape.length;
         const blockCols = this.draggingBlock.shape[0].length;
-        
-        // No need to adjust since we're using the upper-left corner directly
-        const adjustedGridX = gridX;
-        const adjustedGridY = gridY;
 
         // Only show preview if over the grid
-        if (adjustedGridX >= 0 && adjustedGridY >= 0 && 
-            adjustedGridX + blockCols <= this.gridSystem.width && 
-            adjustedGridY + blockRows <= this.gridSystem.height) {
+        if (gridX >= 0 && gridY >= 0 && 
+            gridX + blockCols <= this.gridSystem.width && 
+            gridY + blockRows <= this.gridSystem.height) {
             // Ensure we're using the correct block data
             const previewBlock = {
                 ...this.draggingBlock,
                 shape: this.draggingBlock.shape.map(row => [...row])
             };
             
-            this.gridSystem.previewPlacement(previewBlock, adjustedGridY, adjustedGridX);
+            this.gridSystem.previewPlacement(previewBlock, gridY, gridX);
         } else {
             this.gridSystem.clearPreview();
         }
@@ -351,38 +363,19 @@ class Game {
 
         const target = this.draggingElement;
         
-        // Calculate grid position using the upper-left corner of the block
-        const gridRect = this.gridSystem.element.getBoundingClientRect();
+        // Calculate grid position using the block's center of mass
         const targetRect = target.getBoundingClientRect();
-        
-        const cellSize = 40; // var(--grid-size)
-        
-        // Get the upper-left corner coordinates
-        const upperLeftX = targetRect.left;
-        const upperLeftY = targetRect.top;
-        
-        // Calculate relative position to the grid
-        const relativeX = upperLeftX - gridRect.left;
-        const relativeY = upperLeftY - gridRect.top;
-        
-        // Round to the nearest grid cell
-        const gridX = Math.round(relativeX / cellSize);
-        const gridY = Math.round(relativeY / cellSize);
-        
-        // Block dimensions
-        const blockRows = this.draggingBlock.shape.length;
-        const blockCols = this.draggingBlock.shape[0].length;
-        
-        // No need to adjust since we're using the upper-left corner directly
-        const adjustedGridX = gridX;
-        const adjustedGridY = gridY;
+        const snappedPosition = this.getSnappedGridPosition(targetRect);
+        const gridX = snappedPosition ? snappedPosition.gridX : NaN;
+        const gridY = snappedPosition ? snappedPosition.gridY : NaN;
 
         // Try to place the block
-        if (this.gridSystem.canPlaceBlock(this.draggingBlock, adjustedGridY, adjustedGridX)) {
-            console.log('Placing block at', adjustedGridY, adjustedGridX, 'Block:', this.draggingBlock);
+        if (!Number.isNaN(gridX) && !Number.isNaN(gridY) &&
+            this.gridSystem.canPlaceBlock(this.draggingBlock, gridY, gridX)) {
+            console.log('Placing block at', gridY, gridX, 'Block:', this.draggingBlock);
             
             // Place block
-            if (this.gridSystem.placeBlock(this.draggingBlock, adjustedGridY, adjustedGridX)) {
+            if (this.gridSystem.placeBlock(this.draggingBlock, gridY, gridX)) {
                 console.log('Block placed successfully');
                 // Play block placement sound
                 this.soundSystem.playSound(SOUND_TYPES.BLOCK_PLACE);
@@ -406,6 +399,8 @@ class Game {
                     Array.from(document.getElementById('availableBlocks').children).forEach((elem, idx) => {
                         elem.dataset.blockIndex = idx.toString();
                     });
+
+                    this.updateAvailableBlocksState();
                 }
                 
                 // Clear any previews
@@ -467,6 +462,18 @@ class Game {
         this.draggingBlock = null;
         this.draggingElement = null;
         this.draggingBlockIndex = undefined; // Clear stored index
+        this.draggingBlockCenter = null;
+        this.gameStateManager.updateState({ draggingBlockId: null });
+    }
+
+    updateAvailableBlocksState() {
+        const serializedBlocks = this.availableBlocks.map(block => ({
+            id: block.id,
+            color: block.color,
+            shape: block.shape.map(row => [...row])
+        }));
+
+        this.gameStateManager.updateState({ availableBlocks: serializedBlocks });
     }
 
     calculatePlacementScore(block) {
@@ -475,12 +482,86 @@ class Game {
             sum + row.reduce((rowSum, cell) => rowSum + cell, 0), 0);
     }
 
+    calculateBlockCenterOffset(block) {
+        const shape = block.shape || [];
+        const filledCells = [];
+
+        for (let row = 0; row < shape.length; row++) {
+            for (let col = 0; col < shape[row].length; col++) {
+                if (shape[row][col] === 1) {
+                    filledCells.push({ row, col });
+                }
+            }
+        }
+
+        if (filledCells.length === 0) {
+            const fallbackCols = (shape[0]?.length || 0) / 2;
+            const fallbackRows = shape.length / 2;
+            return {
+                offsetCols: fallbackCols,
+                offsetRows: fallbackRows,
+                offsetXPx: fallbackCols * this.cellSize,
+                offsetYPx: fallbackRows * this.cellSize
+            };
+        }
+
+        let sumRows = 0;
+        let sumCols = 0;
+        filledCells.forEach(cell => {
+            sumRows += cell.row + 0.5;
+            sumCols += cell.col + 0.5;
+        });
+
+        const offsetRows = sumRows / filledCells.length;
+        const offsetCols = sumCols / filledCells.length;
+
+        return {
+            offsetCols,
+            offsetRows,
+            offsetXPx: offsetCols * this.cellSize,
+            offsetYPx: offsetRows * this.cellSize
+        };
+    }
+
+    getSnappedGridPosition(targetRect) {
+        if (!targetRect || !this.gridSystem || !this.gridSystem.element) {
+            return null;
+        }
+
+        const gridRect = this.gridSystem.element.getBoundingClientRect();
+        if (!gridRect) {
+            return null;
+        }
+
+        if (!this.draggingBlockCenter && this.draggingBlock) {
+            this.draggingBlockCenter = this.calculateBlockCenterOffset(this.draggingBlock);
+        }
+
+        if (!this.draggingBlockCenter) {
+            return null;
+        }
+
+        const center = this.draggingBlockCenter;
+        const relativeCenterX = (targetRect.left - gridRect.left) + center.offsetXPx;
+        const relativeCenterY = (targetRect.top - gridRect.top) + center.offsetYPx;
+
+        const gridX = Math.round((relativeCenterX / this.cellSize) - center.offsetCols);
+        const gridY = Math.round((relativeCenterY / this.cellSize) - center.offsetRows);
+
+        return { gridX, gridY };
+    }
+
     updateScore(newScore) {
         this.score = newScore;
         document.getElementById('score').textContent = this.score;
+        this.gameStateManager.updateState({ score: this.score });
     }
 
     checkForGameOver() {
+        if (this.isGameOver) {
+            return true;
+        }
+
         // Check if any available block can be placed on the grid
         const canPlaceAnyBlock = this.availableBlocks.some(block => {
             // Scan the entire grid for a valid placement
@@ -507,11 +588,18 @@ class Game {
     }
     
     gameOver() {
+        if (this.isGameOver) {
+            return;
+        }
+
+        this.isGameOver = true;
+        this.gameStateManager.updateState({ isGameOver: true });
+
         // Stop main game music and play game over sound
         this.soundSystem.stopAllMusic();
         this.soundSystem.playSound(SOUND_TYPES.GAME_OVER);
         this.soundSystem.playMusic(SOUND_TYPES.MUSIC_GAME_OVER);
-        
+
         // Properly clean up resources before showing game over
         this.cleanup();
         
@@ -639,14 +727,39 @@ class Game {
      * This ensures the user can see new blocks before the game possibly ends
      */
     scheduleGameOverCheck() {
-        // Only schedule if no check is already pending
-        if (!this.pendingGameOverCheck) {
-            this.pendingGameOverCheck = true;
-            setTimeout(() => {
+        if (this.isGameOver || this.pendingGameOverCheck) {
+            return;
+        }
+
+        this.pendingGameOverCheck = true;
+        this.gameStateManager.updateState({ pendingGameOverCheck: true });
+
+        if (this.gameOverTimeoutId) {
+            clearTimeout(this.gameOverTimeoutId);
+            this.gameOverTimeoutId = null;
+        }
+
+        this.gameOverTimeoutId = setTimeout(() => {
+            this.gameOverTimeoutId = null;
+            this.pendingGameOverCheck = false;
+            this.gameStateManager.updateState({ pendingGameOverCheck: false });
+
+            if (!this.isGameOver) {
                 // Check if any block can be placed, if not, game over
                 this.checkForGameOver();
-                this.pendingGameOverCheck = false;
-            }, 500); // Half-second delay - enough to see blocks but not disrupt gameplay
+            }
+        }, 500); // Half-second delay - enough to see blocks but not disrupt gameplay
+    }
+
+    clearScheduledGameOverCheck() {
+        if (this.gameOverTimeoutId) {
+            clearTimeout(this.gameOverTimeoutId);
+            this.gameOverTimeoutId = null;
+        }
+
+        if (this.pendingGameOverCheck) {
+            this.pendingGameOverCheck = false;
+            this.gameStateManager.updateState({ pendingGameOverCheck: false });
         }
     }
     
@@ -666,12 +779,22 @@ class Game {
         // Reset score and game state flags
         this.score = 0;
         this.pendingGameOverCheck = false;
+        this.isGameOver = false;
+        this.gameOverTimeoutId = null;
+        this.gameStateManager.updateState({
+            isGameOver: false,
+            pendingGameOverCheck: false
+        });
         
         // Clear block container
         const blockContainer = document.getElementById('availableBlocks');
         if (blockContainer) {
             blockContainer.innerHTML = '';
         }
+
+        // Reset available blocks state before regenerating
+        this.availableBlocks = [];
+        this.updateAvailableBlocksState();
         
         // Reinitialize the game
         this.setupGame();
@@ -689,15 +812,15 @@ class Game {
         console.log('Game: Cleaning up resources...');
         // Stop animation loop
         this.stopAnimationLoop();
-        
+
+        this.clearScheduledGameOverCheck();
+
         // Remove any interact instances
-        const blockGroups = document.querySelectorAll('.block-group');
-        blockGroups.forEach(blockGroup => {
-            if (blockGroup._interact) {
-                blockGroup._interact.unset();
-            }
-        });
-        
+        if (this.blockInteractable) {
+            this.blockInteractable.unset();
+            this.blockInteractable = null;
+        }
+
         // Clear audio event listeners
         const masterVolumeSlider = document.getElementById('masterVolume');
         const muteToggle = document.getElementById('muteToggle');
@@ -711,7 +834,11 @@ class Game {
             const newToggle = muteToggle.cloneNode(true);
             muteToggle.parentNode.replaceChild(newToggle, muteToggle);
         }
-        
+
+        // Reset available blocks to avoid stale state references
+        this.availableBlocks = [];
+        this.updateAvailableBlocksState();
+
         // Reset game state
         this.draggingBlock = null;
         this.draggingElement = null;
@@ -720,6 +847,7 @@ class Game {
         this.dragY = undefined;
         this._lastDragX = undefined;
         this._lastDragY = undefined;
+        this.gameStateManager.updateState({ draggingBlockId: null });
     }
 }
 

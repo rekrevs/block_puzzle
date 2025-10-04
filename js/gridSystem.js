@@ -4,12 +4,14 @@ export class GridSystem {
         this.height = height;
         this.grid = Array(height).fill().map(() => Array(width).fill(null));
         this.element = document.getElementById('gameGrid');
+        this.cellElements = Array.from({ length: height }, () => Array(width).fill(null));
         this.initializeGrid();
     }
 
     initializeGrid() {
         // Clear existing grid
         this.element.innerHTML = '';
+        this.cellElements = Array.from({ length: this.height }, () => Array(this.width).fill(null));
         
         // Create grid cells
         for (let i = 0; i < this.height; i++) {
@@ -18,6 +20,7 @@ export class GridSystem {
                 cell.className = 'grid-cell';
                 cell.dataset.row = i;
                 cell.dataset.col = j;
+                this.cellElements[i][j] = cell;
                 this.element.appendChild(cell);
             }
         }
@@ -108,16 +111,19 @@ export class GridSystem {
 
     // Clear placement preview
     clearPreview() {
-        const cells = this.element.getElementsByClassName('grid-cell');
-        for (const cell of cells) {
-            // Only reset background color for non-filled cells
-            if (!cell.classList.contains('filled')) {
-                cell.style.backgroundColor = '';
-                cell.style.transform = '';
+        for (let i = 0; i < this.height; i++) {
+            for (let j = 0; j < this.width; j++) {
+                const cell = this.cellElements[i][j];
+                if (!cell) continue;
+
+                if (!cell.classList.contains('filled')) {
+                    cell.style.backgroundColor = '';
+                    cell.style.transform = '';
+                }
+                cell.classList.remove('preview');
+                cell.classList.remove('potential-clear');
+                cell.classList.remove('invalid-placement');
             }
-            cell.classList.remove('preview');
-            cell.classList.remove('potential-clear');
-            cell.classList.remove('invalid-placement');
         }
     }
 
@@ -206,7 +212,11 @@ export class GridSystem {
 
     // Get grid cell element at specified position
     getCellElement(row, col) {
-        return this.element.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
+            return null;
+        }
+
+        return this.cellElements[row][col];
     }
 
     // Clear filled lines and return score + counts

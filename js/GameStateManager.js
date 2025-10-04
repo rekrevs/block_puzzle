@@ -5,8 +5,12 @@ class GameStateManager {
       level: 1,
       isGameOver: false,
       isPaused: false,
-      error: null
+      error: null,
+      availableBlocks: [],
+      draggingBlockId: null,
+      pendingGameOverCheck: false
     };
+    this.observers = [];
   }
 
   getState() {
@@ -27,7 +31,6 @@ class GameStateManager {
   }
 
   addObserver(callback) {
-    this.observers = this.observers || [];
     this.observers.push(callback);
   }
 
