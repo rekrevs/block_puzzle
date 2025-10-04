@@ -51,7 +51,7 @@ The Block Puzzle Game is a well-structured web application built with vanilla Ja
 4. **Performance Optimizations**
    - Consider adding double buffering for grid updates
    - Optimize block generation and rotation calculations
-   - Cache expensive DOM queries inside frequent drag handlers
+   - ✅ Cached drag/grid DOM lookups (commit e7d861b)
 
 5. **Error Handling**
    - Surface GameStateManager errors to the UI
