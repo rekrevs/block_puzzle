@@ -31,6 +31,16 @@ The game follows a component-based architecture with these main systems:
 - Rebinds audio control listeners after cleanup/reset cycles
 - Schedules game-over checks through `GameStateManager` to avoid duplicate triggers
 
+### Module Layout (Current Implementation)
+```
+js/
+├── blockSystem.js       // Block generation and variant logic
+├── gridSystem.js        // Grid state, placement, and clearing
+├── soundSystem.js       // Audio playback and volume controls
+├── GameStateManager.js  // Centralized state updates and observers
+└── main.js              // Game bootstrap, drag lifecycle, scoring
+```
+
 ### Grid System (`gridSystem.js`)
 - Manages 8x8 grid state
 - Handles block placement validation
@@ -52,6 +62,19 @@ The game follows a component-based architecture with these main systems:
 ### Game State (`GameStateManager.js`)
 - Centralizes score, availability, drag selection, and game-over flags
 - Notifies observers on state changes (score, pending checks, errors)
+- Current state shape:
+  ```javascript
+  {
+    score: number,
+    level: number,
+    isGameOver: boolean,
+    isPaused: boolean,
+    error: string | null,
+    availableBlocks: BlockSummary[],
+    draggingBlockId: string | null,
+    pendingGameOverCheck: boolean
+  }
+  ```
 
 ## External Dependencies
 

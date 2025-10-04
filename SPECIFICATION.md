@@ -334,28 +334,8 @@ soundSystem.toggleMute();  // Switch between muted and unmuted
 
 ## Code Architecture
 
-### Module Layout (Current Implementation)
-```
-js/
-├── blockSystem.js       // Block generation and variant logic
-├── gridSystem.js        // Grid state, placement, and clearing
-├── soundSystem.js       // Audio playback and volume controls
-├── GameStateManager.js  // Centralized state updates and observers
-└── main.js              // Game bootstrap, drag lifecycle, scoring
-```
-
-### State Management
-```javascript
-class GameState {
-  score: number;
-  level: number;
-  isGameOver: boolean;
-  isPaused: boolean;
-  error: string | null;
-  availableBlocks: BlockSummary[];
-  draggingBlockId: string | null;
-  pendingGameOverCheck: boolean;
-}
-```
+### Implementation Notes
+- Provide dedicated modules for block generation, grid management, audio, and overall game coordination (see `SYSTEM.md` for the current layout).
+- Expose game state sufficient for the UI to display score, remaining blocks, and game-over status.
 
 This specification provides a solid foundation for implementing an engaging and polished block puzzle game while maintaining flexibility for future enhancements.
