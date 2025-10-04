@@ -1,5 +1,7 @@
 # Block Puzzle Game - Status Report
 
+This report summarizes the project’s current health relative to the specification, listing strengths, remaining gaps, and recommended next steps.
+
 ## Overview
 The Block Puzzle Game is a well-structured web application built with vanilla JavaScript, featuring a clean architecture and modern UI design. The game implements a classic block puzzle mechanic with drag-and-drop functionality, line clearing, and scoring.
 
@@ -25,11 +27,15 @@ The Block Puzzle Game is a well-structured web application built with vanilla Ja
    - Optimized drag-and-drop implementation
    - Efficient grid operations
    - Proper use of CSS transforms and transitions
+   - Center-based snapping with cached grid lookups keeps previews aligned with placement
 
 5. **Accessibility and UX**
    - Responsive design with mobile considerations
    - Clear visual feedback for user actions
    - Audio controls stay functional after resets, improving session flow
+6. **Game Flow Resilience**
+   - Scheduled game-over checks prevent duplicate overlays
+   - Cleanup clears timers and interact.js handlers to avoid leaks
 
 ### Areas for Improvement
 

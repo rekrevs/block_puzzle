@@ -1,5 +1,7 @@
 # Block Puzzle Game Specification
 
+This document captures the intended product requirements, player experience, and acceptance criteria for the Block Puzzle game. Use it as the contract the implementation must satisfy.
+
 ## Core Game Mechanics
 
 ### Grid and Layout
@@ -297,19 +299,19 @@ soundSystem.toggleMute();  // Switch between muted and unmuted
 
 ### Required Libraries
 1. Core Framework
-   - Vanilla JavaScript (ES2025)
+   - Vanilla JavaScript (ES6 modules)
    - CSS3 for styling and basic animations
 
 2. Drag and Drop
-   - interact.js v2.x
+   - interact.js 1.10+ (current CDN build)
    - Custom touch event handling for mobile
 
 3. Animation
-   - GSAP 5.x for complex animations
+   - GSAP 3.12.x for optional micro-interactions
    - CSS transitions for simple effects
 
 4. Audio
-   - Howler.js 3.x for sound management
+   - Howler.js 2.2.x for sound management
 
 ### Browser Support
 - Modern browsers (last 2 versions)
@@ -332,32 +334,27 @@ soundSystem.toggleMute();  // Switch between muted and unmuted
 
 ## Code Architecture
 
-### Module Structure
+### Module Layout (Current Implementation)
 ```
-src/
-├── core/
-│   ├── GameState.js
-│   ├── BlockManager.js
-│   └── ScoreManager.js
-├── ui/
-│   ├── GridRenderer.js
-│   ├── BlockRenderer.js
-│   └── AnimationManager.js
-├── utils/
-│   ├── BlockGenerator.js
-│   └── CollisionDetector.js
-└── audio/
-    └── SoundManager.js
+js/
+├── blockSystem.js       // Block generation and variant logic
+├── gridSystem.js        // Grid state, placement, and clearing
+├── soundSystem.js       // Audio playback and volume controls
+├── GameStateManager.js  // Centralized state updates and observers
+└── main.js              // Game bootstrap, drag lifecycle, scoring
 ```
 
 ### State Management
 ```javascript
 class GameState {
-  grid: number[][];           // Current grid state
-  score: number;              // Current score
-  availableBlocks: Block[];   // Current round's blocks
-  gameOver: boolean;          // Game state
-  combo: number;              // Current combo multiplier
+  score: number;
+  level: number;
+  isGameOver: boolean;
+  isPaused: boolean;
+  error: string | null;
+  availableBlocks: BlockSummary[];
+  draggingBlockId: string | null;
+  pendingGameOverCheck: boolean;
 }
 ```
 

@@ -1,5 +1,7 @@
 # Block Puzzle Game System Architecture
 
+This document explains how the current codebase is structured to fulfill the specification, describing module boundaries, responsibilities, and key design decisions.
+
 ## Overview
 
 The game follows a component-based architecture with these main systems:
