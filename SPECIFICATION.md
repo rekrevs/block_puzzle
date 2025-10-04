@@ -160,6 +160,7 @@ const BLOCK_COLORS = [
      - Example: 3 lines = 12 + (12 * 1.5) + (12 * 2) = 54 points
    - Simultaneous row and column clears double the total
    - Full grid clear bonus: 200 points
+   - `GridSystem.clearLines()` returns `{ score, rowsCleared, colsCleared }` so callers can react to the number of lines cleared without re-deriving it from points
 
 ### Game Over Conditions
 - Occurs when no available block can be legally placed
@@ -235,7 +236,8 @@ const SOUND_PATHS = {
 ### Volume Control Methods
 ```javascript
 // Volume control example
-const soundSystem = new SoundSystem();
+const gameStateManager = new GameStateManager();
+const soundSystem = new SoundSystem(gameStateManager);
 
 // Set master volume (0.0 - 1.0)
 soundSystem.setMasterVolume(0.8);

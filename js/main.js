@@ -13,7 +13,7 @@ class Game {
         this.blockSystem = new BlockSystem();
         console.log('Game: BlockSystem created');
         this.gridSystem = new GridSystem(gridSize, gridSize);
-        this.soundSystem = new SoundSystem();
+        this.soundSystem = new SoundSystem(gameStateManager);
         console.log('Game: SoundSystem created');
         console.log('Game: GridSystem created');
         this.score = 0;
@@ -413,19 +413,19 @@ class Game {
                 
                 // Update score
                 const placementScore = this.calculatePlacementScore(this.draggingBlock);
-                const clearScore = this.gridSystem.clearLines();
+                const clearResult = this.gridSystem.clearLines();
+                const totalLinesCleared = (clearResult.rowsCleared || 0) + (clearResult.colsCleared || 0);
                 
                 // Play line clear sound if lines were cleared
-                if (clearScore > 0) {
-                    const linesCleared = clearScore / 10; // Assuming 10 points per line
-                    if (linesCleared > 1) {
+                if (clearResult.score > 0) {
+                    if (totalLinesCleared > 1) {
                         this.soundSystem.playSound(SOUND_TYPES.MULTI_LINE_CLEAR);
                     } else {
                         this.soundSystem.playSound(SOUND_TYPES.LINE_CLEAR);
                     }
                 }
                 
-                this.updateScore(this.score + placementScore + clearScore);
+                this.updateScore(this.score + placementScore + clearResult.score);
             } else {
                 console.error('Failed to place block');
             }
@@ -573,6 +573,11 @@ class Game {
         const masterVolumeSlider = document.getElementById('masterVolume');
         const muteToggle = document.getElementById('muteToggle');
 
+        if (!masterVolumeSlider || !muteToggle) {
+            console.warn('Game: Audio controls not found in DOM');
+            return;
+        }
+
         // Initialize volume slider
         masterVolumeSlider.addEventListener('input', (e) => {
             const volume = parseFloat(e.target.value);
@@ -651,7 +656,10 @@ class Game {
         
         // Ensure proper cleanup before creating new game components
         this.cleanup();
-        
+
+        // Rebind audio controls after cleanup replaced the DOM nodes
+        this.initAudioControls();
+
         // Reset grid system
         this.gridSystem = new GridSystem(8, 8);
         

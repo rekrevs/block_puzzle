@@ -209,7 +209,7 @@ export class GridSystem {
         return this.element.querySelector(`[data-row="${row}"][data-col="${col}"]`);
     }
 
-    // Clear filled lines and return score
+    // Clear filled lines and return score + counts
     clearLines() {
         const clearedRows = new Set();
         const clearedCols = new Set();
@@ -253,9 +253,6 @@ export class GridSystem {
         const basePoints = 12;
         
         if (clearedRows.size > 0 || clearedCols.size > 0) {
-            let multiplier = 1;
-            
-            // Add points for each line with increasing multiplier
             [...clearedRows, ...clearedCols].forEach((_, index) => {
                 score += basePoints * (1 + index * 0.5);
             });
@@ -271,7 +268,11 @@ export class GridSystem {
             }
         }
 
-        return Math.floor(score);
+        return {
+            score: Math.floor(score),
+            rowsCleared: clearedRows.size,
+            colsCleared: clearedCols.size
+        };
     }
 
     // Check if grid is completely empty

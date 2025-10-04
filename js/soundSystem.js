@@ -86,11 +86,15 @@ export class SoundSystem {
                 src: [path],
                 volume: this.soundVolume * this.masterVolume,
                 onloaderror: () => {
-                    this.gameStateManager.setError(`Failed to load sound: ${key}`);
+                    if (this.gameStateManager) {
+                        this.gameStateManager.setError(`Failed to load sound: ${key}`);
+                    }
                 }
             });
         } catch (error) {
-            this.gameStateManager.setError(`Sound initialization error: ${error.message}`);
+            if (this.gameStateManager) {
+                this.gameStateManager.setError(`Sound initialization error: ${error.message}`);
+            }
             return null;
         }
     }
@@ -195,7 +199,9 @@ export class SoundSystem {
                 console.warn(`SoundSystem: Sound ${soundType} not found`);
             }
         } catch (error) {
-            this.gameStateManager.setError(`Sound playback error: ${error.message}`);
+            if (this.gameStateManager) {
+                this.gameStateManager.setError(`Sound playback error: ${error.message}`);
+            }
         }
     }
     
