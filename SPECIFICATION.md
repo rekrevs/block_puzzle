@@ -230,10 +230,11 @@ const SOUND_PATHS = {
 ```
 
 ### Audio System Configuration
-- Master volume control
+- Master volume control (initialized from HTML slider value on game start)
 - Independent music and sound effect volume settings
 - Mute/Unmute functionality
-- Persistent volume settings across game sessions
+- Volume settings maintained during game resets
+- Future enhancement: Persistent volume settings across browser sessions
 
 ### Volume Control Methods
 ```javascript

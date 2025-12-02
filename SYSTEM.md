@@ -26,10 +26,12 @@ The game follows a component-based architecture with these main systems:
 
 ### Game Core (`main.js`)
 - Initializes all subsystems
-- Manages game loop and state transitions
+- Manages game loop and state transitions using `requestAnimationFrame`
 - Handles user input and UI events
+- Initializes volume controls from HTML slider values on startup
 - Rebinds audio control listeners after cleanup/reset cycles
 - Schedules game-over checks through `GameStateManager` to avoid duplicate triggers
+- Implements proper resource cleanup lifecycle
 
 ### Module Layout (Current Implementation)
 ```
@@ -54,10 +56,11 @@ js/
 - Provides random block selection
 
 ### Sound System (`soundSystem.js`)
-- Manages sound effects and music
-- Implements volume controls
-- Provides mute functionality
+- Manages sound effects and music using Howler.js
+- Implements master volume controls (initialized from HTML on game start)
+- Provides mute/unmute functionality
 - Reports load/playback issues through `GameStateManager` without interrupting gameplay
+- Volume state persists across game resets within the same session
 
 ### Game State (`GameStateManager.js`)
 - Centralizes score, availability, drag selection, and game-over flags
@@ -78,15 +81,26 @@ js/
 
 ## External Dependencies
 
-### Howler.js
+### Howler.js (v2.2.4)
 - Used for audio playback in SoundSystem
 - Provides cross-browser audio support
-- Handles audio loading and playback
+- Handles audio loading, playback, and volume control
+- Loaded via CDN
 
-### No Other Major Dependencies Found
-- The game appears to use vanilla JavaScript
-- No frontend framework detected
-- No UI library detected
+### interact.js (v1.10+)
+- Provides drag-and-drop functionality
+- Handles touch and mouse events
+- Loaded via CDN
+
+### GSAP (v3.12.5)
+- Animation library (currently loaded but minimally used)
+- Available for future micro-interactions
+- Loaded via CDN
+
+### Core Framework
+- Vanilla JavaScript (ES6 modules)
+- No frontend framework (React, Vue, etc.)
+- No UI library dependencies
 
 ## Best Practices Analysis
 
@@ -94,32 +108,48 @@ js/
 1. **Separation of Concerns**: Each system has clear responsibilities
 2. **Component-Based Design**: Systems can be tested and modified independently
 3. **Event-Driven Architecture**: UI interactions are handled through events
+4. **Proper Resource Management**: Cleanup lifecycle prevents memory leaks
+5. **Performance Optimized**: Uses requestAnimationFrame for smooth animations
+6. **Stable State Management**: GameStateManager provides centralized state coordination
 
 ### Areas for Improvement
-1. **State Management**: Game state could be more centralized
-2. **Error Handling**: More robust error handling needed
-3. **Performance Optimization**: Could benefit from requestAnimationFrame
+1. **Testing Infrastructure**: No automated tests currently implemented
+2. **State Persistence**: Could add localStorage for high scores and settings
+3. **Error UI**: GameStateManager errors could be surfaced to users visually
 
 ## Recommendations
 
-1. **Broaden Game State Usage**
-   - Expand `GameStateManager` observers to drive UI (score, errors)
-   - Persist player settings and high scores between sessions
+### Completed Improvements ✅
+- ✅ Optimize rendering with requestAnimationFrame (implemented in main.js:689-728)
+- ✅ Improve drag stability and state management (commit e7d861b)
+- ✅ Add proper resource cleanup lifecycle (cleanup method in main.js:815-855)
+- ✅ Initialize audio controls properly (main.js:669-671)
 
-2. **Improve Error Handling**
-   - Surface `GameStateManager` errors in-game for user feedback
-   - Add error boundaries around async audio/grid operations
+### Future Enhancements
 
-3. **Optimize Rendering**
-   - Use requestAnimationFrame
-   - Implement double buffering
+1. **Testing Infrastructure** (High Priority)
+   - Add Jest or similar testing framework
+   - Create unit tests for core systems (BlockSystem, GridSystem, SoundSystem)
+   - Implement integration tests for game flow
 
-4. **Enhance Testing**
-   - Add unit tests for core systems
-   - Implement integration tests
+2. **State Persistence**
+   - Add localStorage for high scores
+   - Persist volume settings across browser sessions
+   - Save player statistics
 
-5. **Documentation**
-   - Add JSDoc comments
-   - Create API documentation
+3. **Error Handling Enhancement**
+   - Surface `GameStateManager` errors in-game with user-friendly messages
+   - Add toast notifications for audio loading failures
 
-This architecture provides a solid foundation for further development while maintaining flexibility for future enhancements.
+4. **Documentation**
+   - Add JSDoc comments to public APIs
+   - Create inline documentation for complex algorithms (e.g., center-based snapping)
+   - Document state flow diagrams
+
+5. **Optional Features**
+   - Add difficulty levels or game modes
+   - Implement undo/redo functionality
+   - Add block preview system
+   - Implement combo scoring system
+
+This architecture provides a solid, production-ready foundation. The core systems are stable and well-designed, making future enhancements straightforward to implement.

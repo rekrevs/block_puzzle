@@ -666,6 +666,10 @@ class Game {
             return;
         }
 
+        // Apply initial volume from HTML
+        const initialVolume = parseFloat(masterVolumeSlider.value);
+        this.soundSystem.setMasterVolume(initialVolume);
+
         // Initialize volume slider
         masterVolumeSlider.addEventListener('input', (e) => {
             const volume = parseFloat(e.target.value);
