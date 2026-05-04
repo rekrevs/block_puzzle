@@ -30,27 +30,23 @@ const SOUND_PATHS = {
 
 export class SoundSystem {
     constructor(gameStateManager) {
-        console.log('SoundSystem: Initializing...');
         this.gameStateManager = gameStateManager;
         this.sounds = {};
         this.music = {};
         this.isMuted = false;
-        this.musicVolume = 0.2;  
+        this.musicVolume = 0.2;
         this.soundVolume = 0.5;
         this.masterVolume = 1.0;
-        
-        // Check if Howler is available
+
         if (typeof Howl === 'undefined') {
-            console.warn('SoundSystem: Howler.js not found, using stub implementation');
             this.initSoundStubs();
         } else {
             this.initSounds();
         }
     }
-    
+
     initSounds() {
         try {
-            // Initialize sound effects with Howler
             this.sounds = {
                 [SOUND_TYPES.BLOCK_PLACE]: this.loadSound(SOUND_TYPES.BLOCK_PLACE, SOUND_PATHS[SOUND_TYPES.BLOCK_PLACE]),
                 [SOUND_TYPES.BLOCK_INVALID]: this.loadSound(SOUND_TYPES.BLOCK_INVALID, SOUND_PATHS[SOUND_TYPES.BLOCK_INVALID]),
@@ -59,8 +55,7 @@ export class SoundSystem {
                 [SOUND_TYPES.GAME_OVER]: this.loadSound(SOUND_TYPES.GAME_OVER, SOUND_PATHS[SOUND_TYPES.GAME_OVER]),
                 [SOUND_TYPES.MENU_SELECT]: this.loadSound(SOUND_TYPES.MENU_SELECT, SOUND_PATHS[SOUND_TYPES.MENU_SELECT])
             };
-            
-            // Initialize music with Howler
+
             this.music = {
                 [SOUND_TYPES.MUSIC_MAIN]: new Howl({
                     src: [SOUND_PATHS[SOUND_TYPES.MUSIC_MAIN]],
@@ -73,9 +68,8 @@ export class SoundSystem {
                     loop: false
                 })
             };
-            console.log('SoundSystem: Initialized with Howler.js');
         } catch (error) {
-            console.error('SoundSystem: Error initializing sounds with Howler', error);
+            console.error('SoundSystem: Howler init failed, falling back to stubs', error);
             this.initSoundStubs();
         }
     }
@@ -100,42 +94,24 @@ export class SoundSystem {
     }
 
     initSoundStubs() {
-        // Fallback stub implementations for sounds
+        // No-op stubs that mirror the Howler surface (play/stop/volume) so the rest of
+        // the system behaves identically whether Howler is present or not.
+        const noop = () => {};
+        const makeStub = () => ({ play: noop, stop: noop, pause: noop, volume: noop });
+
         this.sounds = {
-            [SOUND_TYPES.BLOCK_PLACE]: {
-                play: () => console.log('Sound: Playing block place sound')
-            },
-            [SOUND_TYPES.BLOCK_INVALID]: {
-                play: () => console.log('Sound: Playing invalid placement sound')
-            },
-            [SOUND_TYPES.LINE_CLEAR]: {
-                play: () => console.log('Sound: Playing line clear sound')
-            },
-            [SOUND_TYPES.MULTI_LINE_CLEAR]: {
-                play: () => console.log('Sound: Playing multi-line clear sound')
-            },
-            [SOUND_TYPES.GAME_OVER]: {
-                play: () => console.log('Sound: Playing game over sound')
-            },
-            [SOUND_TYPES.MENU_SELECT]: {
-                play: () => console.log('Sound: Playing menu select sound')
-            }
+            [SOUND_TYPES.BLOCK_PLACE]: makeStub(),
+            [SOUND_TYPES.BLOCK_INVALID]: makeStub(),
+            [SOUND_TYPES.LINE_CLEAR]: makeStub(),
+            [SOUND_TYPES.MULTI_LINE_CLEAR]: makeStub(),
+            [SOUND_TYPES.GAME_OVER]: makeStub(),
+            [SOUND_TYPES.MENU_SELECT]: makeStub()
         };
-        
-        // Music stubs
+
         this.music = {
-            [SOUND_TYPES.MUSIC_MAIN]: {
-                play: () => console.log('Music: Playing main game music'),
-                stop: () => console.log('Music: Stopping main game music'),
-                loop: true
-            },
-            [SOUND_TYPES.MUSIC_GAME_OVER]: {
-                play: () => console.log('Music: Playing game over music'),
-                stop: () => console.log('Music: Stopping game over music'),
-                loop: false
-            }
+            [SOUND_TYPES.MUSIC_MAIN]: makeStub(),
+            [SOUND_TYPES.MUSIC_GAME_OVER]: makeStub()
         };
-        console.log('SoundSystem: Initialized with stubs');
     }
     
     // New volume control methods
@@ -171,32 +147,24 @@ export class SoundSystem {
     }
 
     updateAllVolumes() {
-        // Update volumes for all sounds and music
-        Object.values(this.sounds).forEach(sound => {
-            if (sound.volume) {
-                sound.volume(this.isMuted ? 0 : this.soundVolume * this.masterVolume);
-            }
-        });
+        const effectVolume = this.isMuted ? 0 : this.soundVolume * this.masterVolume;
+        const musicVolume = this.isMuted ? 0 : this.musicVolume * this.masterVolume;
 
+        Object.values(this.sounds).forEach(sound => {
+            if (sound && typeof sound.volume === 'function') sound.volume(effectVolume);
+        });
         Object.values(this.music).forEach(music => {
-            if (music.volume) {
-                music.volume(this.isMuted ? 0 : this.musicVolume * this.masterVolume);
-            }
+            if (music && typeof music.volume === 'function') music.volume(musicVolume);
         });
     }
 
     // Play a sound effect
     playSound(soundType) {
+        if (this.isMuted) return;
         try {
-            if (this.isMuted) return;
-            
             const sound = this.sounds[soundType];
-            if (sound) {
-                if (typeof sound.play === 'function') {
-                    sound.play();
-                }
-            } else {
-                console.warn(`SoundSystem: Sound ${soundType} not found`);
+            if (sound && typeof sound.play === 'function') {
+                sound.play();
             }
         } catch (error) {
             if (this.gameStateManager) {
@@ -204,36 +172,21 @@ export class SoundSystem {
             }
         }
     }
-    
+
     // Start playing background music
     playMusic(musicType) {
         if (this.isMuted) return;
-        
-        // Stop any currently playing music
         this.stopAllMusic();
-        
         const music = this.music[musicType];
-        if (music) {
-            if (typeof music.play === 'function') {
-                music.play();
-            }
-            console.log(`SoundSystem: Playing ${musicType} music`);
-        } else {
-            console.warn(`SoundSystem: Music ${musicType} not found`);
-        }
+        if (music && typeof music.play === 'function') music.play();
     }
-    
+
     // Stop all music
     stopAllMusic() {
         Object.values(this.music).forEach(track => {
-            if (track) {
-                if (typeof track.stop === 'function') {
-                    track.stop();
-                } else if (typeof track.pause === 'function') {
-                    // Howler uses stop(), but we'll handle pause too for compatibility
-                    track.pause();
-                }
-            }
+            if (!track) return;
+            if (typeof track.stop === 'function') track.stop();
+            else if (typeof track.pause === 'function') track.pause();
         });
     }
 }

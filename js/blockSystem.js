@@ -95,9 +95,7 @@ export const BASE_BLOCKS = [
 
 export class BlockSystem {
     constructor() {
-        console.log('BlockSystem: Initializing...');
         this.blockVariants = this.generateAllBlockVariants();
-        console.log(`BlockSystem: Generated ${this.blockVariants.length} block variants`);
     }
 
     // Normalize a block shape by moving it to top-left alignment
@@ -183,33 +181,22 @@ export class BlockSystem {
     // Generate all unique variants (rotations and mirrors) of a base shape
     generateVariants(baseShape) {
         const variants = [];
-        let current = baseShape;
-        
-        // Generate all four rotations
-        for (let i = 0; i < 4; i++) {
-            const normalized = this.normalizeShape(current);
+        const consider = shape => {
+            const normalized = this.normalizeShape(shape);
             if (normalized && !this.shapeExists(normalized, variants)) {
-                variants.push({
-                    shape: normalized,
-                    color: null // Will be assigned later
-                });
+                variants.push({ shape: normalized });
             }
+        };
+
+        let current = baseShape;
+        for (let i = 0; i < 4; i++) {
+            consider(current);
             current = this.rotateShape(current);
         }
 
-        // Generate mirrored variants
-        const mirrored = this.mirrorShape(baseShape);
-        current = mirrored;
-        
-        // Generate all four rotations of the mirrored shape
+        current = this.mirrorShape(baseShape);
         for (let i = 0; i < 4; i++) {
-            const normalized = this.normalizeShape(current);
-            if (normalized && !this.shapeExists(normalized, variants)) {
-                variants.push({
-                    shape: normalized,
-                    color: null
-                });
-            }
+            consider(current);
             current = this.rotateShape(current);
         }
 
@@ -218,53 +205,32 @@ export class BlockSystem {
 
     // Generate all block variants from base blocks
     generateAllBlockVariants() {
-        console.log('BlockSystem: Generating all block variants...');
-        console.log('BlockSystem: Base blocks:', BASE_BLOCKS);
         const allVariants = [];
-        
-        BASE_BLOCKS.forEach((baseBlock) => {
-            console.log(`BlockSystem: Processing base block ${baseBlock.name}`);
+        BASE_BLOCKS.forEach(baseBlock => {
             const variants = this.generateVariants(baseBlock.shape);
-            console.log(`BlockSystem: Generated ${variants.length} variants for ${baseBlock.name}`);
             variants.forEach((variant, index) => {
                 allVariants.push({
                     id: `${baseBlock.name}-${index}`,
                     baseShape: baseBlock.name,
-                    shape: variant.shape,
-                    // No color assigned here - will be assigned randomly when selected
-                    color: null
+                    shape: variant.shape
                 });
             });
         });
-
         return allVariants;
     }
 
     // Get a random selection of blocks with random colors
     getRandomBlocks(count) {
-        console.log(`BlockSystem: Getting ${count} random blocks from ${this.blockVariants.length} variants`);
-        const blocks = [...this.blockVariants];
+        const pool = [...this.blockVariants];
         const selected = [];
-        
-        while (selected.length < count && blocks.length > 0) {
-            // Select a random block
-            const index = Math.floor(Math.random() * blocks.length);
-            const block = blocks.splice(index, 1)[0];
-            
-            // Assign a random color from the Google palette
-            const randomColorIndex = Math.floor(Math.random() * BLOCK_COLORS.length);
-            const randomColor = BLOCK_COLORS[randomColorIndex];
-            
-            // Create a new block with the random color
-            const coloredBlock = {
-                ...block,
-                color: randomColor
-            };
-            
-            console.log('BlockSystem: Selected block:', coloredBlock);
-            selected.push(coloredBlock);
+
+        while (selected.length < count && pool.length > 0) {
+            const index = Math.floor(Math.random() * pool.length);
+            const variant = pool.splice(index, 1)[0];
+            const color = BLOCK_COLORS[Math.floor(Math.random() * BLOCK_COLORS.length)];
+            selected.push({ ...variant, color });
         }
-        
+
         return selected;
     }
 }

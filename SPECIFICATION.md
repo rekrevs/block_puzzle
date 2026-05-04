@@ -308,7 +308,6 @@ soundSystem.toggleMute();  // Switch between muted and unmuted
    - Custom touch event handling for mobile
 
 3. Animation
-   - GSAP 3.12.x for optional micro-interactions
    - CSS transitions for simple effects
 
 4. Audio

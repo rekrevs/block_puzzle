@@ -1,0 +1,17 @@
+{
+  "name": "block-puzzle",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A vanilla-JS block puzzle game with drag-and-drop placement and line clearing.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "serve": "npx --yes serve -l 8080 ."
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0",
+    "vitest": "^2.1.0"
+  }
+}

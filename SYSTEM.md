@@ -1,155 +1,98 @@
 # Block Puzzle Game System Architecture
 
-This document explains how the current codebase is structured to fulfill the specification, describing module boundaries, responsibilities, and key design decisions.
+This document explains how the codebase is structured to fulfill the specification, describing module boundaries, responsibilities, and key design decisions.
 
 ## Overview
 
-The game follows a component-based architecture with these main systems:
+The game follows a component-based architecture with these systems:
 
-1. **Game Core**
-   - Manages game state and flow
-   - Coordinates other systems
+1. **Game Core** (`main.js`) — bootstraps subsystems, owns the drag lifecycle, coordinates score and game-over flow.
+2. **Grid System** (`gridSystem.js`) — owns the 8×8 grid, validation, placement, line-clearing math, and preview rendering.
+3. **Block System** (`blockSystem.js`) — generates shape variants (rotations + mirrors) and supplies random selections.
+4. **Sound System** (`soundSystem.js`) — Howler-based audio with a no-op stub fallback.
+5. **State Manager** (`GameStateManager.js`) — single source of truth for UI-relevant state, broadcast via observers.
+6. **UI Bindings** (`uiBindings.js`) — connects state to DOM (score, error toast).
 
-2. **Grid System**
-   - Handles block placement and line clearing
-   - Manages grid state and validation
+## Module Layout
 
-3. **Block System**
-   - Generates and manages block shapes
-   - Handles block rotations and variants
-
-4. **Sound System**
-   - Manages audio playback
-   - Handles volume controls and mute state
-
-## Component Breakdown
-
-### Game Core (`main.js`)
-- Initializes all subsystems
-- Manages game loop and state transitions using `requestAnimationFrame`
-- Handles user input and UI events
-- Initializes volume controls from HTML slider values on startup
-- Rebinds audio control listeners after cleanup/reset cycles
-- Schedules game-over checks through `GameStateManager` to avoid duplicate triggers
-- Implements proper resource cleanup lifecycle
-
-### Module Layout (Current Implementation)
 ```
 js/
 ├── blockSystem.js       // Block generation and variant logic
-├── gridSystem.js        // Grid state, placement, and clearing
+├── gridSystem.js        // Grid state, placement, clearing
 ├── soundSystem.js       // Audio playback and volume controls
-├── GameStateManager.js  // Centralized state updates and observers
+├── GameStateManager.js  // Centralized state + observer pattern
+├── uiBindings.js        // State → DOM bridge
 └── main.js              // Game bootstrap, drag lifecycle, scoring
 ```
 
+## Component Details
+
+### Game Core (`main.js`)
+- Reads `--grid-size` from CSS at startup and on `resize` so block snapping stays correct on every breakpoint.
+- Owns a single `dragState` object during drag instead of a swarm of fields.
+- Runs the drag-time `requestAnimationFrame` loop only while a drag is active.
+- Stores audio listener references and removes them cleanly on reset (no `cloneNode` tricks).
+- `setupDragAndDrop` runs once; `interact('.block-group')` matches new tiles dynamically.
+- Schedules game-over checks with a 500 ms delay and a 200 ms retry while a drag is in progress.
+
 ### Grid System (`gridSystem.js`)
-- Manages 8x8 grid state
-- Handles block placement validation
-- Implements line clearing logic and reports `{ score, rowsCleared, colsCleared }`
-- Provides visual feedback for placements
-- Caches grid cell DOM nodes for O(1) access during previews and clears
+- Caches grid cell DOM nodes for O(1) access during previews and clears.
+- `clearLines` returns `{ score, rowsCleared, colsCleared }`.
+- Score formula iterates over `totalLines = rowsCleared + colsCleared` (deterministic), applies the row+column doubling, and adds the +200 full-grid-clear bonus when the grid empties.
+- `clearLines` resets each cleared cell's `transform` and removes preview-related classes so no visual artifacts remain.
 
 ### Block System (`blockSystem.js`)
-- Generates all block variants
-- Handles block rotations and mirroring
-- Provides random block selection
+- 12 base shapes; rotations + mirrors deduplicated into 36 unique variants.
+- Random selection draws from the variant pool with a palette color from the Google four-color palette.
 
 ### Sound System (`soundSystem.js`)
-- Manages sound effects and music using Howler.js
-- Implements master volume controls (initialized from HTML on game start)
-- Provides mute/unmute functionality
-- Reports load/playback issues through `GameStateManager` without interrupting gameplay
-- Volume state persists across game resets within the same session
+- Initializes Howler when present, otherwise installs no-op stubs that mirror Howler's `play`/`stop`/`volume` surface so muting and volume control behave identically in both modes.
+- Reports load/playback failures via `GameStateManager.setError`, which `uiBindings.js` surfaces as a toast.
 
-### Game State (`GameStateManager.js`)
-- Centralizes score, availability, drag selection, and game-over flags
-- Notifies observers on state changes (score, pending checks, errors)
-- Current state shape:
+### State Manager (`GameStateManager.js`)
+- State shape:
   ```javascript
   {
     score: number,
-    level: number,
     isGameOver: boolean,
-    isPaused: boolean,
     error: string | null,
     availableBlocks: BlockSummary[],
     draggingBlockId: string | null,
     pendingGameOverCheck: boolean
   }
   ```
+- `updateState` rejects unknown keys (whitelist).
+- `addObserver` returns an unsubscribe function.
+
+### UI Bindings (`uiBindings.js`)
+- Subscribes to state changes once.
+- Updates `#score` only when score actually changes.
+- Shows/hides the error toast based on `state.error` with a 4-second auto-dismiss.
 
 ## External Dependencies
 
 ### Howler.js (v2.2.4)
-- Used for audio playback in SoundSystem
-- Provides cross-browser audio support
-- Handles audio loading, playback, and volume control
-- Loaded via CDN
+- Cross-browser audio playback. Loaded via CDN.
 
 ### interact.js (v1.10+)
-- Provides drag-and-drop functionality
-- Handles touch and mouse events
-- Loaded via CDN
+- Drag-and-drop with touch + mouse. Loaded via CDN.
 
-### GSAP (v3.12.5)
-- Animation library (currently loaded but minimally used)
-- Available for future micro-interactions
-- Loaded via CDN
+### Vitest + JSDOM (dev only)
+- Test runner and DOM environment for the test suites under `tests/`.
 
 ### Core Framework
-- Vanilla JavaScript (ES6 modules)
-- No frontend framework (React, Vue, etc.)
-- No UI library dependencies
+- Vanilla JavaScript (ES modules)
+- No frontend framework, no UI library
 
-## Best Practices Analysis
+## Testing
 
-### Strengths
-1. **Separation of Concerns**: Each system has clear responsibilities
-2. **Component-Based Design**: Systems can be tested and modified independently
-3. **Event-Driven Architecture**: UI interactions are handled through events
-4. **Proper Resource Management**: Cleanup lifecycle prevents memory leaks
-5. **Performance Optimized**: Uses requestAnimationFrame for smooth animations
-6. **Stable State Management**: GameStateManager provides centralized state coordination
+Run `npm test`. Suites cover:
+- `blockSystem.test.js` — normalization, rotation, mirroring, variant generation, random selection.
+- `gridSystem.test.js` — placement, clearing rows/columns/both, transform cleanup, `canPlaceAnyBlock`.
+- `scoring.test.js` — exact line-clear scoring per SPECIFICATION (1, 2, 3 lines; row+col doubling; +200 bonus).
+- `gameStateManager.test.js` — observer fan-out, partial updates, error lifecycle.
 
-### Areas for Improvement
-1. **Testing Infrastructure**: No automated tests currently implemented
-2. **State Persistence**: Could add localStorage for high scores and settings
-3. **Error UI**: GameStateManager errors could be surfaced to users visually
-
-## Recommendations
-
-### Completed Improvements ✅
-- ✅ Optimize rendering with requestAnimationFrame (implemented in main.js:689-728)
-- ✅ Improve drag stability and state management (commit e7d861b)
-- ✅ Add proper resource cleanup lifecycle (cleanup method in main.js:815-855)
-- ✅ Initialize audio controls properly (main.js:669-671)
-
-### Future Enhancements
-
-1. **Testing Infrastructure** (High Priority)
-   - Add Jest or similar testing framework
-   - Create unit tests for core systems (BlockSystem, GridSystem, SoundSystem)
-   - Implement integration tests for game flow
-
-2. **State Persistence**
-   - Add localStorage for high scores
-   - Persist volume settings across browser sessions
-   - Save player statistics
-
-3. **Error Handling Enhancement**
-   - Surface `GameStateManager` errors in-game with user-friendly messages
-   - Add toast notifications for audio loading failures
-
-4. **Documentation**
-   - Add JSDoc comments to public APIs
-   - Create inline documentation for complex algorithms (e.g., center-based snapping)
-   - Document state flow diagrams
-
-5. **Optional Features**
-   - Add difficulty levels or game modes
-   - Implement undo/redo functionality
-   - Add block preview system
-   - Implement combo scoring system
-
-This architecture provides a solid, production-ready foundation. The core systems are stable and well-designed, making future enhancements straightforward to implement.
+## Notes for future work
+- Persistence (localStorage for high scores and volume) is not implemented.
+- Accessibility (ARIA, keyboard control) is out of scope in this iteration.
+- Subresource integrity / CSP for the CDN scripts is not configured.

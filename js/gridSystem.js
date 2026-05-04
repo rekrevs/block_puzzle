@@ -238,13 +238,18 @@ export class GridSystem {
             }
         }
 
+        const resetCell = cell => {
+            if (!cell) return;
+            cell.style.backgroundColor = '';
+            cell.style.transform = '';
+            cell.classList.remove('filled', 'preview', 'potential-clear', 'invalid-placement');
+        };
+
         // Clear rows
         clearedRows.forEach(row => {
             this.grid[row].fill(null);
             for (let j = 0; j < this.width; j++) {
-                const cell = this.getCellElement(row, j);
-                cell.style.backgroundColor = '';
-                cell.classList.remove('filled');
+                resetCell(this.getCellElement(row, j));
             }
         });
 
@@ -252,27 +257,26 @@ export class GridSystem {
         clearedCols.forEach(col => {
             for (let i = 0; i < this.height; i++) {
                 this.grid[i][col] = null;
-                const cell = this.getCellElement(i, col);
-                cell.style.backgroundColor = '';
-                cell.classList.remove('filled');
+                resetCell(this.getCellElement(i, col));
             }
         });
 
         // Calculate score
+        const totalLines = clearedRows.size + clearedCols.size;
         let score = 0;
         const basePoints = 12;
-        
-        if (clearedRows.size > 0 || clearedCols.size > 0) {
-            [...clearedRows, ...clearedCols].forEach((_, index) => {
-                score += basePoints * (1 + index * 0.5);
-            });
 
-            // Double score if both rows and columns were cleared
+        if (totalLines > 0) {
+            for (let n = 0; n < totalLines; n++) {
+                score += basePoints * (1 + n * 0.5);
+            }
+
+            // Double score if both rows and columns were cleared simultaneously
             if (clearedRows.size > 0 && clearedCols.size > 0) {
                 score *= 2;
             }
 
-            // Check for full grid clear
+            // Full grid clear bonus
             if (this.isGridEmpty()) {
                 score += 200;
             }
@@ -292,30 +296,20 @@ export class GridSystem {
 
     // Check if any of the given blocks can be placed
     canPlaceAnyBlock(blocks) {
-        console.log('Checking if any blocks can be placed:', blocks);
-        if (!blocks || blocks.length === 0) {
-            console.log('No blocks to check');
-            return false;
-        }
+        if (!blocks || blocks.length === 0) return false;
 
         for (const block of blocks) {
-            if (!block.shape || block.shape.length === 0) {
-                console.log('Invalid block shape:', block);
-                continue;
-            }
+            if (!block.shape || block.shape.length === 0) continue;
 
-            // Try every possible position on the grid
             for (let i = 0; i < this.height; i++) {
                 for (let j = 0; j < this.width; j++) {
                     if (this.canPlaceBlock(block, i, j)) {
-                        console.log(`Found valid placement for block at ${i},${j}:`, block);
                         return true;
                     }
                 }
             }
         }
 
-        console.log('No valid placements found for any blocks');
         return false;
     }
 }
