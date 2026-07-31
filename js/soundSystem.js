@@ -158,9 +158,9 @@ export class SoundSystem {
         });
     }
 
-    // Play a sound effect
+    // Play a sound effect. Muting is handled purely via volume (see updateAllVolumes),
+    // so sounds/music keep their play state and unmuting works in any order.
     playSound(soundType) {
-        if (this.isMuted) return;
         try {
             const sound = this.sounds[soundType];
             if (sound && typeof sound.play === 'function') {
@@ -175,7 +175,6 @@ export class SoundSystem {
 
     // Start playing background music
     playMusic(musicType) {
-        if (this.isMuted) return;
         this.stopAllMusic();
         const music = this.music[musicType];
         if (music && typeof music.play === 'function') music.play();

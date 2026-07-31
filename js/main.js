@@ -7,7 +7,6 @@ import { bindUI } from './uiBindings.js';
 const GAME_OVER_CHECK_DELAY_MS = 500;
 const GAME_OVER_CHECK_RETRY_MS = 200;
 const SNAP_BACK_MS = 200;
-const NEW_BLOCKS_DELAY_MS = 100;
 const DEFAULT_CELL_SIZE_PX = 40;
 
 class Game {
@@ -34,6 +33,20 @@ class Game {
         };
         window.addEventListener('resize', this.onResize);
 
+        // Browsers block audio until the first user gesture, so music requested
+        // before then is queued and started from this one-time listener.
+        this.hasUserGesture = false;
+        this.pendingMusic = null;
+        this.onFirstGesture = () => {
+            this.hasUserGesture = true;
+            if (this.pendingMusic) {
+                const music = this.pendingMusic;
+                this.pendingMusic = null;
+                this.soundSystem.playMusic(music);
+            }
+        };
+        document.addEventListener('pointerdown', this.onFirstGesture, { once: true });
+
         this.gameStateManager.updateState({
             score: 0,
             isGameOver: false,
@@ -58,7 +71,15 @@ class Game {
     setupGame() {
         this.updateScore(0);
         this.generateNewBlocks();
-        this.soundSystem.playMusic(SOUND_TYPES.MUSIC_MAIN);
+        this.requestMusic(SOUND_TYPES.MUSIC_MAIN);
+    }
+
+    requestMusic(musicType) {
+        if (this.hasUserGesture) {
+            this.soundSystem.playMusic(musicType);
+        } else {
+            this.pendingMusic = musicType;
+        }
     }
 
     generateNewBlocks() {
@@ -95,40 +116,27 @@ class Game {
         blockGroup.className = 'block-group';
         blockGroup.dataset.blockId = block.id;
 
-        const cellSize = this.cellSize;
-        const filledCells = [];
-
+        // Size and position everything in units of --grid-size so tray blocks
+        // track the responsive breakpoints exactly like the grid cells do.
         for (let i = 0; i < block.shape.length; i++) {
             for (let j = 0; j < block.shape[i].length; j++) {
                 if (block.shape[i][j] === 1) {
                     const cell = document.createElement('div');
                     cell.className = 'block-cell';
                     cell.style.backgroundColor = block.color;
-                    cell.style.width = `${cellSize}px`;
-                    cell.style.height = `${cellSize}px`;
-                    cell.style.left = `${j * cellSize}px`;
-                    cell.style.top = `${i * cellSize}px`;
+                    cell.style.left = `calc(var(--grid-size) * ${j})`;
+                    cell.style.top = `calc(var(--grid-size) * ${i})`;
                     cell.dataset.row = i;
                     cell.dataset.col = j;
-                    filledCells.push({ row: i, col: j });
                     blockGroup.appendChild(cell);
                 }
             }
         }
 
-        const minRow = Math.min(...filledCells.map(c => c.row));
-        const minCol = Math.min(...filledCells.map(c => c.col));
-        const maxRow = Math.max(...filledCells.map(c => c.row));
-        const maxCol = Math.max(...filledCells.map(c => c.col));
-        const width = (maxCol - minCol + 1) * cellSize;
-        const height = (maxRow - minRow + 1) * cellSize;
-
-        blockGroup.style.width = `${width}px`;
-        blockGroup.style.height = `${height}px`;
+        blockGroup.style.width = `calc(var(--grid-size) * ${block.shape[0].length})`;
+        blockGroup.style.height = `calc(var(--grid-size) * ${block.shape.length})`;
         blockGroup.style.position = 'relative';
         blockGroup.style.cursor = 'grab';
-        blockGroup.dataset.width = width;
-        blockGroup.dataset.height = height;
 
         return blockGroup;
     }
@@ -263,7 +271,7 @@ class Game {
             this.updateScore(this.score + placementScore + clearResult.score);
 
             if (this.availableBlocks.length === 0) {
-                setTimeout(() => this.generateNewBlocks(), NEW_BLOCKS_DELAY_MS);
+                this.generateNewBlocks();
             }
             this.scheduleGameOverCheck();
         } else {
@@ -375,6 +383,9 @@ class Game {
 
     checkForGameOver() {
         if (this.isGameOver) return true;
+        // An empty tray means a refill is pending, never game over —
+        // canPlaceAnyBlock([]) would report false and end the game.
+        if (this.availableBlocks.length === 0) return false;
         const canPlace = this.gridSystem.canPlaceAnyBlock(this.availableBlocks);
         if (!canPlace) {
             this.gameOver();
@@ -390,7 +401,7 @@ class Game {
 
         this.soundSystem.stopAllMusic();
         this.soundSystem.playSound(SOUND_TYPES.GAME_OVER);
-        this.soundSystem.playMusic(SOUND_TYPES.MUSIC_GAME_OVER);
+        this.requestMusic(SOUND_TYPES.MUSIC_GAME_OVER);
 
         this.cleanup({ keepStateManagerListeners: true });
 
@@ -574,6 +585,7 @@ class Game {
         this.availableBlocks = [];
         if (!options.keepStateManagerListeners) {
             window.removeEventListener('resize', this.onResize);
+            document.removeEventListener('pointerdown', this.onFirstGesture);
         }
         this.publishAvailableBlocks();
 
